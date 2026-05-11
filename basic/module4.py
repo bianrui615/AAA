@@ -108,30 +108,26 @@ def _safe_rms(values: List[float]) -> float:
 def _collect_satellite_positions(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     epoch_time: datetime,
-) -> Tuple[Dict[str, ECEF], Dict[str, float]]:
-    """为当前历元选择健康星历，并计算卫星 ECEF 坐标和钟差。
+) -> Dict[str, ECEF]:
+    """为当前历元选择健康星历，并计算卫星 ECEF 坐标。
 
-    底层实现调用 module1 的 compute_satellite_position 和
-    compute_satellite_clock_bias。
+    底层实现调用 module1 的 compute_satellite_position。
     """
 
     satellite_positions: Dict[str, ECEF] = {}
-    satellite_clock_biases: Dict[str, float] = {}
     for sat_id in sorted(nav_data):
         eph = select_ephemeris(nav_data, sat_id, epoch_time, healthy_only=True)
         if eph is None:
             continue
         try:
             x, y, z = compute_satellite_position(eph, epoch_time)
-            clock_bias, _ = compute_satellite_clock_bias(eph, epoch_time)
             position_norm = math.sqrt(x * x + y * y + z * z)
             if position_norm <= 0.0:
                 continue
             satellite_positions[sat_id] = (x, y, z)
-            satellite_clock_biases[sat_id] = clock_bias
         except Exception:
             continue
-    return satellite_positions, satellite_clock_biases
+    return satellite_positions
 
 
 def run_continuous_positioning(
@@ -163,7 +159,7 @@ def run_continuous_positioning(
     total_epochs = int((end_time - start_time).total_seconds() // interval_seconds) + 1
 
     for epoch_time in _time_range(start_time, end_time, interval_seconds):
-        satellite_positions, satellite_clock_biases = _collect_satellite_positions(nav_data, epoch_time)
+        satellite_positions = _collect_satellite_positions(nav_data, epoch_time)
         satellite_count = len(satellite_positions)
 
         if satellite_count < 4:
@@ -196,7 +192,6 @@ def run_continuous_positioning(
             receiver_true_position,
             epoch_time,
             rng=rng,
-            satellite_clock_biases=satellite_clock_biases,
         )
         pseudoranges = pseudorange_records_to_dict(pseudo_records)
         solution = solve_spp(

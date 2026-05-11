@@ -103,6 +103,7 @@ class BroadcastEphemeris:
     tgd2: float  # BDS TGD2 群延迟，单位 s
     transmission_time: float  # 电文发射时刻，BDS 周内秒
     fit_interval: float = 0.0
+    parse_status: str = "ok"  # 解析状态：ok / partial / failed
 
 
 @dataclass
@@ -128,6 +129,35 @@ def _extract_floats(line: str) -> List[float]:
     return [_rinex_float(token) for token in _FLOAT_PATTERN.findall(line)]
 
 
+def parse_nav_float(value: str) -> float:
+    """解析 RINEX 导航文件中的浮点数，兼容 D/E 科学计数法。"""
+    cleaned = value.strip().replace("D", "E").replace("d", "e")
+    if not cleaned:
+        return 0.0
+    return float(cleaned)
+
+
+def parse_nav_4_fields(line: str, start: int = 4) -> List[float]:
+    """按固定宽度解析一行中的 4 个浮点数字段，每字段 19 字符。
+
+    RINEX 3.x 导航文件数据行格式（默认从索引 4 开始）：
+    - 第 1 个字段：start + 0  ~ start + 18
+    - 第 2 个字段：start + 19 ~ start + 37
+    - 第 3 个字段：start + 38 ~ start + 56
+    - 第 4 个字段：start + 57 ~ start + 75
+
+    对于记录首行（钟差参数），可从 start=23 开始解析 af0/af1/af2。
+    """
+    fields = []
+    for offset in (0, 19, 38, 57):
+        text = line[start + offset : start + offset + 19].strip()
+        if text:
+            fields.append(parse_nav_float(text))
+        else:
+            fields.append(0.0)
+    return fields
+
+
 def _parse_epoch_from_first_line(line: str) -> datetime:
     """解析 RINEX 3.x 导航记录首行中的星历钟参考时间 toc。"""
     year = int(line[4:8])
@@ -141,7 +171,10 @@ def _parse_epoch_from_first_line(line: str) -> datetime:
 
 
 def _build_ephemeris(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
-    """将 8 行 RINEX 3.x BDS 导航记录转换为 BroadcastEphemeris。"""
+    """将 8 行 RINEX 3.x BDS 导航记录转换为 BroadcastEphemeris。
+
+    兼容普通 RINEX NAV 文件解析，使用正则提取浮点数。
+    """
     if len(record_lines) < 8:
         return None
 
@@ -200,13 +233,120 @@ def _build_ephemeris(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
         tgd2=values[23],
         transmission_time=values[24],
         fit_interval=values[25],
+        parse_status="ok",
+    )
+
+
+def _build_ephemeris_cnav(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
+    """将 8 行 BDS-3 CNAV 导航记录转换为 BroadcastEphemeris，使用固定宽度解析。"""
+    if len(record_lines) < 8:
+        return None
+
+    first_line = record_lines[0]
+    sat_id = first_line[:3].strip()
+    if not sat_id.startswith("C"):
+        return None
+
+    try:
+        prn = int(sat_id[1:])
+        if prn < 19:
+            return None
+    except ValueError:
+        return None
+
+    toc = _parse_epoch_from_first_line(first_line)
+
+    # 第 1 行：af0, af1, af2（从索引 23 开始按 19 字符宽度解析）
+    clock_fields = parse_nav_4_fields(first_line, start=23)
+    af0, af1, af2 = clock_fields[0], clock_fields[1], clock_fields[2]
+
+    # 后 7 行固定宽度解析
+    # 第 2 行：aode, crs, delta_n, m0
+    line2 = parse_nav_4_fields(record_lines[1])
+    aode, crs, delta_n, m0 = line2[0], line2[1], line2[2], line2[3]
+
+    # 第 3 行：cuc, e, cus, sqrtA
+    line3 = parse_nav_4_fields(record_lines[2])
+    cuc, e, cus, sqrtA = line3[0], line3[1], line3[2], line3[3]
+
+    # 第 4 行：toe, cic, omega0, cis
+    line4 = parse_nav_4_fields(record_lines[3])
+    toe, cic, omega0, cis = line4[0], line4[1], line4[2], line4[3]
+
+    # 第 5 行：i0, crc, omega, omega_dot
+    line5 = parse_nav_4_fields(record_lines[4])
+    i0, crc, omega, omega_dot = line5[0], line5[1], line5[2], line5[3]
+
+    # 第 6 行：idot, spare, bdt_week, extra
+    line6 = parse_nav_4_fields(record_lines[5])
+    idot, data_source, bdt_week, _ = line6[0], line6[1], line6[2], line6[3]
+
+    # 第 7 行：第 2 个字段作为 health
+    line7 = parse_nav_4_fields(record_lines[6])
+    accuracy = line7[0] if len(line7) > 0 else 0.0
+    health = line7[1] if len(line7) > 1 else 0.0
+    tgd1 = line7[2] if len(line7) > 2 else 0.0
+    tgd2 = line7[3] if len(line7) > 3 else 0.0
+
+    # 第 8 行：扩展字段
+    line8 = parse_nav_4_fields(record_lines[7])
+    transmission_time = line8[0] if len(line8) > 0 else 0.0
+    fit_interval = line8[3] if len(line8) > 3 else 0.0
+
+    # 判断解析状态
+    parse_status = "ok"
+    try:
+        if sqrtA <= 0:
+            parse_status = "partial_sqrtA_invalid"
+        elif toe <= 0:
+            parse_status = "partial_toe_invalid"
+        elif e < 0:
+            parse_status = "partial_e_invalid"
+    except Exception:
+        parse_status = "partial"
+
+    return BroadcastEphemeris(
+        sat_id=sat_id,
+        toc=toc,
+        af0=af0,
+        af1=af1,
+        af2=af2,
+        aode=aode,
+        crs=crs,
+        delta_n=delta_n,
+        m0=m0,
+        cuc=cuc,
+        eccentricity=e,
+        cus=cus,
+        sqrt_a=sqrtA,
+        toe=toe,
+        cic=cic,
+        omega0=omega0,
+        cis=cis,
+        i0=i0,
+        crc=crc,
+        omega=omega,
+        omega_dot=omega_dot,
+        idot=idot,
+        data_source=data_source,
+        week=bdt_week,
+        accuracy=accuracy,
+        health=health,
+        tgd1=tgd1,
+        tgd2=tgd2,
+        transmission_time=transmission_time,
+        fit_interval=fit_interval,
+        parse_status=parse_status,
     )
 
 
 def parse_rinex_nav_with_info(
     nav_file: str | Path,
 ) -> Tuple[Dict[str, List[BroadcastEphemeris]], NavParseInfo]:
-    """解析 RINEX NAV 文件，并返回北斗三号星历和解析统计信息。"""
+    """解析 RINEX NAV 文件，并返回北斗三号星历和解析统计信息。
+
+    保留为普通 RINEX .nav 文件的兼容入口。
+    """
     path = Path(nav_file)
     info = NavParseInfo(nav_file_path=str(path))
     if not path.exists():
@@ -225,7 +365,7 @@ def parse_rinex_nav_with_info(
     if start_index is None:
         raise ValueError("未在 RINEX NAV 文件中找到 END OF HEADER")
 
-    nav_data: Dict[str, List[BroadcastEphemeris]] = {}
+    records: List[BroadcastEphemeris] = []
     i = start_index
     while i < len(lines):
         line = lines[i]
@@ -257,12 +397,13 @@ def parse_rinex_nav_with_info(
         try:
             eph = _build_ephemeris(record)
             if eph is not None:
-                nav_data.setdefault(eph.sat_id, []).append(eph)
+                records.append(eph)
         except Exception as exc:
             info.failed_records += 1
             info.error_messages.append(f"{sat_id} 第 {i + 1} 行附近解析失败: {exc}")
         i += 8
 
+    nav_data = group_ephemeris_by_sat(records)
     for eph_list in nav_data.values():
         eph_list.sort(key=lambda item: item.toc)
     return nav_data, info
@@ -272,6 +413,146 @@ def parse_rinex_nav(nav_file: str | Path) -> Dict[str, List[BroadcastEphemeris]]
     """解析 RINEX NAV 文件，只返回北斗三号广播星历字典。"""
     nav_data, _ = parse_rinex_nav_with_info(nav_file)
     return nav_data
+
+
+def group_ephemeris_by_sat(
+    records: List[BroadcastEphemeris],
+) -> Dict[str, List[BroadcastEphemeris]]:
+    """将星历记录按卫星编号分组。"""
+    nav_data: Dict[str, List[BroadcastEphemeris]] = {}
+    for eph in records:
+        nav_data.setdefault(eph.sat_id, []).append(eph)
+    return nav_data
+
+
+def parse_bds_cnav_file(
+    nav_path: str | Path,
+) -> Tuple[Dict[str, List[BroadcastEphemeris]], NavParseInfo]:
+    """解析 BDS-3 CNAV1/CNAV2 广播星历文件（如 *.26b_cnav）。
+
+    使用固定宽度解析 8 行一组的北斗三号星历记录。
+    """
+    path = Path(nav_path)
+    info = NavParseInfo(nav_file_path=str(path))
+    if not path.exists():
+        raise FileNotFoundError(f"NAV 文件不存在: {path}")
+
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    if lines:
+        version_text = lines[0][:20].strip()
+        info.rinex_version = version_text or "未知"
+
+    start_index = None
+    for index, line in enumerate(lines):
+        if "END OF HEADER" in line:
+            start_index = index + 1
+            break
+    if start_index is None:
+        raise ValueError("未在 RINEX NAV 文件中找到 END OF HEADER")
+
+    records: List[BroadcastEphemeris] = []
+    i = start_index
+    while i < len(lines):
+        line = lines[i]
+        sat_id = line[:3].strip()
+        if not sat_id:
+            i += 1
+            continue
+
+        if len(lines[i : i + 8]) < 8:
+            info.incomplete_records += 1
+            break
+
+        if not sat_id.startswith("C"):
+            info.skipped_non_bds_records += 1
+            i += 8
+            continue
+
+        try:
+            prn = int(sat_id[1:])
+            if prn < 19:
+                info.skipped_bds2_records += 1
+                i += 8
+                continue
+        except ValueError:
+            info.skipped_non_bds_records += 1
+            i += 8
+            continue
+
+        record_lines = lines[i : i + 8]
+        try:
+            eph = _build_ephemeris_cnav(record_lines)
+            if eph is not None:
+                records.append(eph)
+        except Exception as exc:
+            info.failed_records += 1
+            info.error_messages.append(f"{sat_id} 第 {i + 1} 行附近解析失败: {exc}")
+        i += 8
+
+    nav_data = group_ephemeris_by_sat(records)
+    for eph_list in nav_data.values():
+        eph_list.sort(key=lambda item: item.toc)
+    return nav_data, info
+
+
+def parse_nav_file(
+    nav_path: str | Path,
+) -> Tuple[Dict[str, List[BroadcastEphemeris]], NavParseInfo]:
+    """自动判断文件类型并解析导航文件。
+
+    - 如果文件头包含 CNAV / B-CNAV 关键字，调用 parse_bds_cnav_file；
+    - 否则调用 parse_rinex_nav_with_info 走普通 RINEX NAV 解析逻辑。
+    """
+    path = Path(nav_path)
+    if not path.exists():
+        raise FileNotFoundError(f"NAV 文件不存在: {path}")
+
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    is_cnav = False
+    for line in lines[:120]:
+        if "CNAV" in line or "B-CNAV" in line:
+            is_cnav = True
+            break
+
+    if is_cnav:
+        return parse_bds_cnav_file(path)
+    return parse_rinex_nav_with_info(path)
+
+
+def select_ephemeris_for_epoch(
+    records: List[BroadcastEphemeris],
+    epoch: datetime,
+) -> Optional[BroadcastEphemeris]:
+    """从同一颗卫星的多条星历中选择与 epoch 时间最接近的记录。
+
+    如果同一时刻出现多条记录，优先选择字段完整（parse_status == 'ok'）
+    且 health == 0 的记录。
+    """
+    if not records:
+        return None
+
+    from collections import defaultdict
+
+    # 按 toc 分组，处理同一时刻多条 CNAV 记录的情况
+    by_toc: Dict[datetime, List[BroadcastEphemeris]] = defaultdict(list)
+    for eph in records:
+        by_toc[eph.toc].append(eph)
+
+    # 找到与 epoch 时间差最小的 toc
+    best_toc = min(by_toc.keys(), key=lambda toc: abs((epoch - toc).total_seconds()))
+    candidates = by_toc[best_toc]
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # 多记录时优先：health==0 > parse_status=='ok' > 其他
+    def _priority(eph: BroadcastEphemeris) -> tuple:
+        is_healthy = int(round(eph.health)) == 0
+        is_complete = getattr(eph, "parse_status", "ok") == "ok"
+        return (is_healthy, is_complete)
+
+    candidates.sort(key=_priority, reverse=True)
+    return candidates[0]
 
 
 def select_ephemeris(
@@ -288,7 +569,7 @@ def select_ephemeris(
         eph_list = [eph for eph in eph_list if int(round(eph.health)) == 0]
         if not eph_list:
             return None
-    return min(eph_list, key=lambda eph: abs((epoch_time - eph.toc).total_seconds()))
+    return select_ephemeris_for_epoch(eph_list, epoch_time)
 
 
 # ============================================================================
@@ -405,11 +686,28 @@ def compute_satellite_clock_bias(
     """基于广播星历计算卫星钟差（单位：秒）和相对论效应修正（单位：秒）。
 
     返回 (clock_bias, relativistic_correction)。
-    钟差 = af0 + af1 * dt + af2 * dt^2 + 相对论效应修正
+
+    钟差计算模型：
+        clock_bias = af0 + af1 * dt + af2 * dt^2 + relativistic_correction
+    其中：
+        dt = 观测历元相对星历钟参考时刻 toc 的时间差（单位：s）
+        af0：卫星钟差多项式常数项（单位：s）
+        af1：卫星钟差多项式一次项（单位：s/s）
+        af2：卫星钟差多项式二次项（单位：s/s^2）
+
+    相对论效应修正：
+        relativistic_correction = F * e * sqrt(a) * sin(E)
+    其中：
+        F = -2 * sqrt(mu) / c^2（常数，单位 s/m^(1/2)）
+        e：轨道偏心率
+        sqrt(a)：轨道长半轴平方根（单位：sqrt(m)）
+        E：偏近点角（单位：rad）
     """
+    # 计算观测历元相对星历钟参考时刻 toc 的时间差 dt_clock（单位：s）
     dt_clock = _normalize_time((epoch_time - eph.toc).total_seconds())
 
-    # 偏近点角 E 需要重新计算（与位置计算中一致）
+    # 重新计算偏近点角 E（单位：rad），用于相对论效应修正
+    # 计算过程与 compute_satellite_position 中完全一致，确保 E 相同
     t = _bds_seconds_of_week(epoch_time)
     tk = _normalize_time(t - eph.toe)
     semi_major_axis = eph.sqrt_a * eph.sqrt_a
@@ -419,9 +717,123 @@ def compute_satellite_clock_bias(
     eccentric_anomaly = _solve_kepler(mean_anomaly, eph.eccentricity, 30, 1e-13)
     sin_e = math.sin(eccentric_anomaly)
 
+    # 相对论效应修正（单位：s）
+    # 公式：F * e * sqrt(a) * sin(E)
+    # RELATIVITY_F = -2 * sqrt(MU) / (C * C)，已在模块顶部定义
     relativity = RELATIVITY_F * eph.eccentricity * eph.sqrt_a * sin_e
+
+    # 卫星钟差多项式修正（单位：s）
+    # 公式：af0 + af1 * dt + af2 * dt^2
     clock_bias = eph.af0 + eph.af1 * dt_clock + eph.af2 * dt_clock * dt_clock + relativity
     return clock_bias, relativity
+
+
+def compute_satellite_position_with_debug(
+    eph: BroadcastEphemeris,
+    epoch_time: datetime,
+) -> dict:
+    """基于广播星历计算卫星 ECEF 坐标，并返回中间调试变量。
+
+    返回字典包含以下字段（所有角度单位为 rad，距离单位为 m，时间单位为 s）：
+    - x, y, z: ECEF 坐标（m）
+    - tk: 相对 toe 的时间差（s）
+    - semi_major_axis: 轨道长半轴（m）
+    - mean_motion_0: 参考平均角速度（rad/s）
+    - mean_motion: 改正后平均角速度（rad/s）
+    - mean_anomaly: 平近点角（rad）
+    - eccentric_anomaly: 偏近点角（rad）
+    - true_anomaly: 真近点角（rad）
+    - phi: 纬度幅角（rad）
+    - delta_u: 纬度幅角摄动修正（rad）
+    - delta_r: 轨道半径摄动修正（m）
+    - delta_i: 轨道倾角摄动修正（rad）
+    - u: 改正后纬度幅角（rad）
+    - r: 改正后轨道半径（m）
+    - i: 改正后轨道倾角（rad）
+    - omega_k: 升交点赤经（rad）
+    - x_orb, y_orb: 轨道平面坐标（m）
+    - is_geo: 是否为 GEO 卫星
+    """
+    if eph.sqrt_a <= 0.0:
+        raise ValueError(f"{eph.sat_id} 的 sqrtA 非法：{eph.sqrt_a}")
+
+    # 时间差（单位：s）
+    t = _bds_seconds_of_week(epoch_time)
+    tk = _normalize_time(t - eph.toe)
+
+    # 轨道参数
+    semi_major_axis = eph.sqrt_a * eph.sqrt_a
+    mean_motion_0 = math.sqrt(MU / (semi_major_axis ** 3))
+    mean_motion = mean_motion_0 + eph.delta_n
+    mean_anomaly = math.fmod(eph.m0 + mean_motion * tk, 2.0 * math.pi)
+    eccentric_anomaly = _solve_kepler(mean_anomaly, eph.eccentricity, 30, 1e-13)
+
+    sin_e = math.sin(eccentric_anomaly)
+    cos_e = math.cos(eccentric_anomaly)
+
+    true_anomaly = math.atan2(
+        math.sqrt(1.0 - eph.eccentricity * eph.eccentricity) * sin_e,
+        cos_e - eph.eccentricity,
+    )
+    phi = true_anomaly + eph.omega
+
+    sin_2phi = math.sin(2.0 * phi)
+    cos_2phi = math.cos(2.0 * phi)
+    delta_u = eph.cus * sin_2phi + eph.cuc * cos_2phi
+    delta_r = eph.crs * sin_2phi + eph.crc * cos_2phi
+    delta_i = eph.cis * sin_2phi + eph.cic * cos_2phi
+
+    u = phi + delta_u
+    r = semi_major_axis * (1.0 - eph.eccentricity * cos_e) + delta_r
+    i = eph.i0 + eph.idot * tk + delta_i
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    is_geo = _is_bds_geo(eph.sat_id)
+    if is_geo:
+        omega_k = eph.omega0 + eph.omega_dot * tk - OMEGA_E * eph.toe
+        x_g = x_orb * math.cos(omega_k) - y_orb * math.cos(i) * math.sin(omega_k)
+        y_g = x_orb * math.sin(omega_k) + y_orb * math.cos(i) * math.cos(omega_k)
+        z_g = y_orb * math.sin(i)
+
+        geo_tilt = math.radians(-5.0)
+        x_t = x_g
+        y_t = y_g * math.cos(geo_tilt) + z_g * math.sin(geo_tilt)
+        z_t = -y_g * math.sin(geo_tilt) + z_g * math.cos(geo_tilt)
+
+        cos_rot = math.cos(OMEGA_E * tk)
+        sin_rot = math.sin(OMEGA_E * tk)
+        x = x_t * cos_rot + y_t * sin_rot
+        y = -x_t * sin_rot + y_t * cos_rot
+        z = z_t
+    else:
+        omega_k = eph.omega0 + (eph.omega_dot - OMEGA_E) * tk - OMEGA_E * eph.toe
+        x = x_orb * math.cos(omega_k) - y_orb * math.cos(i) * math.sin(omega_k)
+        y = x_orb * math.sin(omega_k) + y_orb * math.cos(i) * math.cos(omega_k)
+        z = y_orb * math.sin(i)
+
+    return {
+        "x": x, "y": y, "z": z,
+        "tk": tk,
+        "semi_major_axis": semi_major_axis,
+        "mean_motion_0": mean_motion_0,
+        "mean_motion": mean_motion,
+        "mean_anomaly": mean_anomaly,
+        "eccentric_anomaly": eccentric_anomaly,
+        "true_anomaly": true_anomaly,
+        "phi": phi,
+        "delta_u": delta_u,
+        "delta_r": delta_r,
+        "delta_i": delta_i,
+        "u": u,
+        "r": r,
+        "i": i,
+        "omega_k": omega_k,
+        "x_orb": x_orb,
+        "y_orb": y_orb,
+        "is_geo": is_geo,
+    }
 
 
 # ============================================================================
@@ -639,8 +1051,8 @@ def run_module1(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # 1. 解析 NAV 文件
-    nav_data, parse_info = parse_rinex_nav_with_info(nav_path)
+    # 1. 解析 NAV 文件（自动判断是否为 BDS-3 CNAV 格式）
+    nav_data, parse_info = parse_nav_file(nav_path)
 
     # 2. 初始化随机数生成器
     rng = random.Random(seed)
@@ -758,7 +1170,7 @@ def _save_nav_debug_csv(
                         "Cis": eph.cis,
                         "health": eph.health,
                         "is_healthy": "yes" if is_healthy else "no",
-                        "parse_status": "ok",
+                        "parse_status": getattr(eph, "parse_status", "ok"),
                     }
                 )
 

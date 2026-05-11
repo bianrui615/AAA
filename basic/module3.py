@@ -30,9 +30,6 @@ from basic.module1 import (
 ECEF = Tuple[float, float, float]
 C = 299_792_458.0
 
-MIN_ELEVATION_FOR_DELAY_DEG = 5.0
-
-
 def _is_satellite_healthy(
     sat_id: str,
     satellite_health: Optional[Dict[str, float]] = None,
@@ -58,36 +55,6 @@ def filter_healthy_satellites(
         for sat_id, position in satellite_positions.items()
         if _is_satellite_healthy(sat_id, satellite_health)
     }
-
-
-def _delay_mapping_sin(elevation_deg: float) -> float:
-    safe_elevation = max(elevation_deg, MIN_ELEVATION_FOR_DELAY_DEG)
-    return max(math.sin(math.radians(safe_elevation)), 1e-3)
-
-
-def simple_ionosphere_delay(sat_position: ECEF, receiver_position: ECEF) -> float:
-    """简化电离层延迟模型，按高度角对 5 m 天顶延迟做投影。"""
-
-    elevation_deg = satellite_elevation_deg(sat_position, receiver_position)
-    return 5.0 / _delay_mapping_sin(elevation_deg)
-
-
-def saastamoinen_troposphere_delay(sat_position: ECEF, receiver_position: ECEF) -> float:
-    """简化 Saastamoinen 对流层延迟模型，返回路径延迟，单位 m。"""
-
-    lat_deg, _, height = ecef_to_blh(*receiver_position)
-    height = min(max(height, 0.0), 10000.0)
-    elevation_deg = satellite_elevation_deg(sat_position, receiver_position)
-
-    pressure_hpa = 1013.25 * (1.0 - 2.2557e-5 * height) ** 5.2568
-    temperature_k = 291.15 - 0.0065 * height
-    water_vapor_pressure_hpa = 11.7
-    lat = math.radians(lat_deg)
-    zenith_hydrostatic = 0.0022768 * pressure_hpa / (
-        1.0 - 0.00266 * math.cos(2.0 * lat) - 0.00028 * height / 1000.0
-    )
-    zenith_wet = 0.002277 * (1255.0 / temperature_k + 0.05) * water_vapor_pressure_hpa
-    return (zenith_hydrostatic + zenith_wet) / _delay_mapping_sin(elevation_deg)
 
 
 @dataclass
@@ -123,42 +90,38 @@ def generate_simulated_pseudorange_record(
     health: float = 0.0,
     rng: Optional[random.Random] = None,
     receiver_clock_error: Optional[float] = None,
-    satellite_clock_bias: float = 0.0,
 ) -> dict:
-    """生成单颗卫星模拟伪距，并保存每一项误差。
+    """生成单颗卫星模拟伪距，使用与模块一一致的随机高斯误差模型。
 
-    误差模型：
-    P = rho
-        + random.gauss(0, 0.5)       # SISRE
-        + random.gauss(10, 3)        # 电离层误差
-        + random.gauss(4, 1.5)       # 对流层误差
-        + (60 + random.gauss(0, 12)) # 接收机钟差
-        + random.gauss(0, 0.3)       # 观测噪声
+    误差模型（与 module1.simulate_pseudorange 保持一致）：
+        P = rho
+            + random.gauss(0, 0.5)       # SISRE
+            + random.gauss(10, 3)        # 电离层误差
+            + random.gauss(4, 1.5)       # 对流层误差
+            + (60 + random.gauss(0, 12)) # 接收机钟差
+            + random.gauss(0, 0.3)       # 观测噪声
+
+    注：本项目使用模拟伪距，不执行额外的伪距修正。
+        raw_simulated_pseudorange 与 simulated_pseudorange 保持一致。
     """
 
     source = rng or random
     rho = geometric_distance(sat_position, receiver_true_position)
     sisre_error = source.gauss(0.0, 0.5)
-    ionosphere_error = simple_ionosphere_delay(sat_position, receiver_true_position)
-    troposphere_error = saastamoinen_troposphere_delay(sat_position, receiver_true_position)
+    ionosphere_error = source.gauss(10.0, 3.0)
+    troposphere_error = source.gauss(4.0, 1.5)
     if receiver_clock_error is None:
         receiver_clock_error = 60.0 + source.gauss(0.0, 12.0)
     noise_error = source.gauss(0.0, 0.3)
-    satellite_clock_correction_m = C * satellite_clock_bias
-    raw_simulated_pseudorange = (
+
+    # 模拟伪距包含所有误差项，不单独做修正
+    simulated_pseudorange = (
         rho
         + sisre_error
         + ionosphere_error
         + troposphere_error
         + receiver_clock_error
-        - satellite_clock_correction_m
         + noise_error
-    )
-    simulated_pseudorange = (
-        raw_simulated_pseudorange
-        + satellite_clock_correction_m
-        - ionosphere_error
-        - troposphere_error
     )
     elevation_deg = satellite_elevation_deg(sat_position, receiver_true_position)
 
@@ -169,8 +132,8 @@ def generate_simulated_pseudorange_record(
         "sat_Y": sat_position[1],
         "sat_Z": sat_position[2],
         "health": health,
-        "satellite_clock_bias": satellite_clock_bias,
-        "satellite_clock_correction_m": satellite_clock_correction_m,
+        "satellite_clock_bias": 0.0,
+        "satellite_clock_correction_m": 0.0,
         "elevation_deg": elevation_deg,
         "true_receiver_X": receiver_true_position[0],
         "true_receiver_Y": receiver_true_position[1],
@@ -181,7 +144,7 @@ def generate_simulated_pseudorange_record(
         "troposphere_error": troposphere_error,
         "receiver_clock_error": receiver_clock_error,
         "noise_error": noise_error,
-        "raw_simulated_pseudorange": raw_simulated_pseudorange,
+        "raw_simulated_pseudorange": simulated_pseudorange,
         "simulated_pseudorange": simulated_pseudorange,
     }
 
@@ -211,7 +174,6 @@ def generate_simulated_pseudorange_records(
     seed: Optional[int] = None,
     rng: Optional[random.Random] = None,
     satellite_health: Optional[Dict[str, float]] = None,
-    satellite_clock_biases: Optional[Dict[str, float]] = None,
 ) -> List[dict]:
     """为一个历元的多颗卫星生成伪距明细记录，支持随机种子复现。"""
 
@@ -229,11 +191,6 @@ def generate_simulated_pseudorange_records(
                 0.0 if satellite_health is None else float(satellite_health[sat_id]),
                 source,
                 receiver_clock_error=receiver_clock_error,
-                satellite_clock_bias=(
-                    0.0
-                    if satellite_clock_biases is None
-                    else float(satellite_clock_biases.get(sat_id, 0.0))
-                ),
             )
         )
     return records
@@ -266,7 +223,6 @@ def generate_simulated_pseudoranges(
         seed=seed,
         rng=rng,
         satellite_health=None,
-        satellite_clock_biases=None,
     )
     return pseudorange_records_to_dict(records)
 

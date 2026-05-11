@@ -90,25 +90,22 @@ def _format_float(value: float, digits: int = 3) -> str:
 def _collect_satellite_data_from_module1(
     nav_data: dict,
     epoch_time: datetime,
-) -> tuple[dict[str, ECEF], dict[str, float], dict[str, float]]:
-    """直接调用 module1 计算卫星位置、健康状态和钟差。"""
+) -> tuple[dict[str, ECEF], dict[str, float]]:
+    """直接调用 module1 计算卫星位置和健康状态。"""
 
     positions: Dict[str, ECEF] = {}
     health: Dict[str, float] = {}
-    clock_biases: Dict[str, float] = {}
     for sat_id in sorted(nav_data):
         eph = select_ephemeris(nav_data, sat_id, epoch_time, healthy_only=True)
         if eph is None:
             continue
         try:
             x, y, z = compute_satellite_position(eph, epoch_time)
-            clock_bias, _ = compute_satellite_clock_bias(eph, epoch_time)
             positions[sat_id] = (x, y, z)
             health[sat_id] = float(eph.health)
-            clock_biases[sat_id] = clock_bias
         except Exception:
             continue
-    return positions, health, clock_biases
+    return positions, health
 
 
 def write_system_test_report(
@@ -224,7 +221,7 @@ def main() -> int:
         print(f"  解析完成：北斗卫星 {sat_count} 颗，星历记录 {eph_count} 条")
 
         print("模块二：正在计算卫星位置与钟差...")
-        satellite_positions, satellite_health, satellite_clock_biases = _collect_satellite_data_from_module1(
+        satellite_positions, satellite_health = _collect_satellite_data_from_module1(
             nav_data, TEST_EPOCH_TIME
         )
         module_status["module2"] = "完成（由 module1 直接提供）"
@@ -238,7 +235,6 @@ def main() -> int:
             TEST_EPOCH_TIME,
             seed=RANDOM_SEED,
             satellite_health=satellite_health,
-            satellite_clock_biases=satellite_clock_biases,
         )
         pseudoranges = pseudorange_records_to_dict(pseudo_records)
         single_solution = solve_spp(
