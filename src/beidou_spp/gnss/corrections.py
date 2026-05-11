@@ -1,4 +1,4 @@
-"""Pseudorange corrections: satellite clock, ionosphere and troposphere."""
+"""伪距修正：卫星钟差、电离层和对流层。"""
 
 from __future__ import annotations
 
@@ -22,14 +22,14 @@ CORRECTED_COLUMNS = [
 
 
 def correct_pseudorange(pseudorange_table, receiver_ecef: ECEF) -> object:
-    """Apply basic measurement corrections.
+    """应用基础伪距修正。
 
-    Formula used by the SPP solver:
+    SPP 解算使用的修正公式：
         P_corr = P_raw + c * dts - I - T
 
-    where P_raw is raw pseudorange in meters, dts is satellite clock bias in
-    seconds, c is speed of light in m/s, I is ionosphere delay in meters, and T
-    is Saastamoinen troposphere delay in meters.
+    其中 P_raw 为原始伪距，单位 m；dts 为卫星钟差，单位 s；c 为光速，
+    单位 m/s；I 为电离层延迟，单位 m；T 为 Saastamoinen 对流层延迟，
+    单位 m。
     """
 
     rows = pseudorange_table.to_dict("records") if hasattr(pseudorange_table, "to_dict") else list(pseudorange_table)
@@ -60,4 +60,3 @@ def save_corrected_pseudorange(table, output_dir: str | Path) -> Path:
     path = output / "corrected_pseudorange.csv"
     table.to_csv(path, index=False, encoding="utf-8-sig")
     return path
-

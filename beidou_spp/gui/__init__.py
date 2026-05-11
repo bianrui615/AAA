@@ -1,2 +1,1 @@
-"""GUI package wrapper."""
-
+"""图形界面包封装。"""

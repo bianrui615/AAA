@@ -1,4 +1,4 @@
-"""Markdown report generation."""
+"""Markdown 报告生成。"""
 
 from __future__ import annotations
 
@@ -29,18 +29,18 @@ def write_accuracy_report(rows: List[Dict], stats: Dict[str, float], output_dir:
     path.write_text(
         "\n".join(
             [
-                "# Accuracy Report",
+                "# 精度分析报告",
                 "",
-                f"- Total epochs: {len(rows)}",
-                f"- Successful epochs: {len(success)}",
-                f"- Average satellite count: {_fmt(avg_sats, 2)}",
-                f"- Average PDOP: {_fmt(avg_pdop, 3)}",
-                f"- Average GDOP: {_fmt(avg_gdop, 3)}",
-                f"- Mean 3D error: {_fmt(stats.get('mean_error_m', math.nan), 3)} m",
-                f"- RMS 3D error: {_fmt(stats.get('rms_error_m', math.nan), 3)} m",
-                f"- Max 3D error: {_fmt(stats.get('max_error_m', math.nan), 3)} m",
+                f"- 总历元数：{len(rows)}",
+                f"- 成功解算历元数：{len(success)}",
+                f"- 平均卫星数量：{_fmt(avg_sats, 2)}",
+                f"- 平均 PDOP：{_fmt(avg_pdop, 3)}",
+                f"- 平均 GDOP：{_fmt(avg_gdop, 3)}",
+                f"- 三维误差均值：{_fmt(stats.get('mean_error_m', math.nan), 3)} m",
+                f"- 三维误差 RMS：{_fmt(stats.get('rms_error_m', math.nan), 3)} m",
+                f"- 最大三维误差：{_fmt(stats.get('max_error_m', math.nan), 3)} m",
                 "",
-                "## DOP And Accuracy",
+                "## DOP 与定位精度关系",
                 "",
                 relation,
                 "",
@@ -54,7 +54,7 @@ def write_accuracy_report(rows: List[Dict], stats: Dict[str, float], output_dir:
 def write_test_report(scenario_rows: List[Dict], output_path: str | Path) -> Path:
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["# Test Report", "", "| NAV file | Success epochs | RMS error (m) | Max error (m) | Mean GDOP |", "|---|---:|---:|---:|---:|"]
+    lines = ["# 测试报告", "", "| NAV 文件 | 成功历元 | RMS 误差 (m) | 最大误差 (m) | 平均 GDOP |", "|---|---:|---:|---:|---:|"]
     for row in scenario_rows:
         lines.append(
             f"| {row['nav_file']} | {row['success_epochs']}/{row['total_epochs']} | "
@@ -63,4 +63,3 @@ def write_test_report(scenario_rows: List[Dict], output_path: str | Path) -> Pat
     lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
-

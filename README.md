@@ -1,38 +1,38 @@
-# Beidou SPP Full-Flow System
+# 北斗 SPP 全流程定位解算系统
 
-This project implements a pure-Python Beidou RINEX NAV positioning workflow:
+本项目实现一个纯 Python 的北斗 RINEX NAV 定位解算流程：
 
-1. RINEX navigation parsing and simulated pseudorange generation.
-2. Satellite ECEF position and satellite clock calculation from broadcast ephemeris.
-3. Pseudorange correction using satellite clock, simple ionosphere and Saastamoinen troposphere models.
-4. Single Point Positioning using iterative least squares.
-5. Continuous positioning, accuracy analysis, visualization, CLI, GUI and tests.
+1. 解析 RINEX 导航文件，并生成模拟伪距观测值。
+2. 根据广播星历计算卫星 ECEF 坐标和卫星钟差。
+3. 使用卫星钟差、简化电离层模型和 Saastamoinen 对流层模型修正伪距。
+4. 使用迭代最小二乘完成伪距单点定位。
+5. 完成连续定位、精度分析、可视化、命令行入口、图形界面和测试。
 
-The core GNSS algorithms are handwritten. RTKLIB, gnsspy, georinex and similar GNSS positioning libraries are not used.
+核心 GNSS 算法均为手写实现，不调用 RTKLIB、gnsspy、georinex 等第三方 GNSS 定位库。
 
-## CLI
+## 命令行运行
 
 ```powershell
 python -m beidou_spp.cli --nav data/sample.nav --output outputs --max-iter 10 --threshold 1e-4 --elevation-mask 15
 ```
 
-Important options:
+常用参数：
 
 - `--receiver-ecef x,y,z`
 - `--start YYYY-MM-DDTHH:MM:SS`
 - `--end YYYY-MM-DDTHH:MM:SS`
-- `--interval seconds`
-- `--seed integer`
+- `--interval 秒数`
+- `--seed 整数随机种子`
 
-## GUI
+## 图形界面
 
 ```powershell
 python rinex_gui.py
 ```
 
-The GUI supports NAV import, solver parameters, receiver coordinates, running positioning, viewing tables/plots and exporting generated results.
+图形界面支持导入 NAV 文件、设置解算参数和接收机坐标、运行定位、查看结果表格与图像，并导出生成的结果文件。
 
-## Main Outputs
+## 主要输出文件
 
 - `parsed_nav_debug.csv`
 - `simulated_pseudorange.csv`
@@ -45,4 +45,3 @@ The GUI supports NAV import, solver parameters, receiver coordinates, running po
 - `position_error.png`
 - `dop_and_sat_count.png`
 - `test_report.md`
-

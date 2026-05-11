@@ -1,4 +1,4 @@
-"""Broadcast ephemeris satellite position calculation."""
+"""广播星历卫星位置计算。"""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def compute_satellite_states(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     epoch: datetime,
 ) -> object:
-    """Compute ECEF satellite positions and clock bias for one epoch."""
+    """计算单个历元的卫星 ECEF 坐标和钟差。"""
 
     rows: List[dict] = []
     for sat_id in sorted(nav_data):
@@ -59,7 +59,7 @@ def compute_satellite_states(
                     "relativistic_correction_s": state.relativistic_correction,
                     "position_norm_m": state.position_norm,
                     "health": eph.health,
-                    "status": state.status if int(round(float(eph.health))) == 0 else "unhealthy",
+                    "status": state.status if int(round(float(eph.health))) == 0 else "健康状态异常",
                 }
             )
         except Exception as exc:
@@ -68,7 +68,7 @@ def compute_satellite_states(
                     "epoch": epoch.isoformat(sep=" "),
                     "sat_id": sat_id,
                     "health": getattr(eph, "health", ""),
-                    "status": f"failed: {exc}",
+                    "status": f"计算失败：{exc}",
                 }
             )
     return make_dataframe(rows, SATELLITE_DEBUG_COLUMNS)
@@ -100,4 +100,3 @@ def save_satellite_debug(table, output_dir: str | Path) -> Path:
     path = output / "satellite_debug.csv"
     table.to_csv(path, index=False, encoding="utf-8-sig")
     return path
-

@@ -1,14 +1,14 @@
-# Accuracy Report
+# 精度分析报告
 
-- Total epochs: 13
-- Successful epochs: 13
-- Average satellite count: 19.38
-- Average PDOP: 0.446
-- Average GDOP: 0.471
-- Mean 3D error: 0.936 m
-- RMS 3D error: 1.079 m
-- Max 3D error: 2.620 m
+- 总历元数：13
+- 成功解算历元数：13
+- 平均卫星数量：19.38
+- 平均 PDOP：0.446
+- 平均 GDOP：0.471
+- 三维误差均值：0.936 m
+- 三维误差 RMS：1.079 m
+- 最大三维误差：2.620 m
 
-## DOP And Accuracy
+## DOP 与定位精度关系
 
 卫星数量较多且 DOP 较低时，几何结构较好，定位误差整体更稳定。

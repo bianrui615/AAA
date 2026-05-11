@@ -1,2 +1,1 @@
-"""Positioning algorithms and coordinate conversion."""
-
+"""定位算法与坐标转换。"""

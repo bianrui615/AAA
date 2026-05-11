@@ -1,4 +1,4 @@
-"""RINEX NAV parser wrapper with standard debug output."""
+"""RINEX NAV 解析封装和标准调试输出。"""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ NAV_DEBUG_COLUMNS = [
 
 
 def parse_nav_file(nav_path: str | Path) -> Dict[str, List[BroadcastEphemeris]]:
-    """Parse a RINEX NAV file and return Beidou broadcast ephemerides."""
+    """解析 RINEX NAV 文件并返回北斗广播星历。"""
 
     nav_data, _ = parse_rinex_nav_with_info(nav_path)
     return nav_data
@@ -45,7 +45,7 @@ def parse_nav_file(nav_path: str | Path) -> Dict[str, List[BroadcastEphemeris]]:
 def parse_nav_file_with_info(
     nav_path: str | Path,
 ) -> Tuple[Dict[str, List[BroadcastEphemeris]], NavParseInfo]:
-    """Parse a RINEX NAV file and keep parser diagnostics."""
+    """解析 RINEX NAV 文件并保留解析诊断信息。"""
 
     return parse_rinex_nav_with_info(nav_path)
 
@@ -81,7 +81,7 @@ def save_parsed_nav_debug(
     output_dir: str | Path,
     parse_info: NavParseInfo | None = None,
 ) -> Path:
-    """Save standard module-1 parser output: parsed_nav_debug.csv."""
+    """保存模块一标准解析输出 parsed_nav_debug.csv。"""
 
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -90,4 +90,3 @@ def save_parsed_nav_debug(
     path = output / "parsed_nav_debug.csv"
     table.to_csv(path, index=False, encoding="utf-8-sig")
     return path
-

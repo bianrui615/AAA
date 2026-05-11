@@ -1,2 +1,1 @@
-"""GNSS satellite state, correction and DOP helpers."""
-
+"""GNSS 卫星状态、修正和 DOP 工具。"""

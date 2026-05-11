@@ -1,6 +1,6 @@
-# Test Report
+# 测试报告
 
-| NAV file | Success epochs | RMS error (m) | Max error (m) | Mean GDOP |
+| NAV 文件 | 成功历元 | RMS 误差 (m) | 最大误差 (m) | 平均 GDOP |
 |---|---:|---:|---:|---:|
 | tarc0910.26b | 13/13 | 0.756 | 1.795 | 0.471 |
 | tarc1200.26b | 13/13 | 0.478 | 0.833 | 0.529 |

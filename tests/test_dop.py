@@ -6,6 +6,8 @@ from beidou_spp.gnss.dop import compute_dops_from_design
 
 
 def test_dop_values_are_finite_positive():
+    """固定几何矩阵计算出的各类 DOP 应为有限正数。"""
+
     h = np.array(
         [
             [-0.5, -0.4, -0.7, 1.0],
@@ -19,4 +21,3 @@ def test_dop_values_are_finite_positive():
     for value in (gdop, pdop, hdop, vdop, tdop):
         assert math.isfinite(value)
         assert value > 0
-

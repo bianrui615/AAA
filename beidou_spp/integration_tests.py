@@ -1,4 +1,4 @@
-"""Integration scenario runner used to generate docs/test_report.md."""
+"""用于生成 docs/test_report.md 的集成测试场景运行器。"""
 
 from __future__ import annotations
 
@@ -37,4 +37,3 @@ def run_default_scenarios() -> Path:
 
 if __name__ == "__main__":
     print(run_default_scenarios())
-

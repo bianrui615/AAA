@@ -5,6 +5,8 @@ from beidou_spp.positioning.spp_solver import solve_epoch_spp
 
 
 def test_spp_solver_converges_on_synthetic_geometry():
+    """人工几何构型下，SPP 解算应能收敛到接收机坐标。"""
+
     receiver = (1_000_000.0, 2_000_000.0, 3_000_000.0)
     sats = {
         "C01": (20_200_000.0, 1_400_000.0, 21_700_000.0),
@@ -31,6 +33,8 @@ def test_spp_solver_converges_on_synthetic_geometry():
 
 
 def test_spp_solver_fails_with_less_than_four_satellites():
+    """少于 4 颗卫星时，SPP 应返回失败而不是崩溃。"""
+
     solution = solve_epoch_spp(
         {"C01": (20_000_000.0, 0.0, 0.0)},
         {"C01": 21_000_000.0},
@@ -38,4 +42,3 @@ def test_spp_solver_fails_with_less_than_four_satellites():
     )
     assert not solution.converged
     assert "少于 4" in solution.message
-

@@ -1,4 +1,4 @@
-"""Full Beidou SPP pipeline orchestration."""
+"""北斗 SPP 全流程调度。"""
 
 from __future__ import annotations
 
@@ -72,10 +72,10 @@ def _filtered_corrected_dict(corrected_table, pseudo_table) -> Dict[str, float]:
 
 
 def run_pipeline(config: PipelineConfig) -> PipelineResult:
-    """Run modules 1-5 and save all standard outputs."""
+    """运行模块一到模块五，并保存所有标准输出。"""
 
     if config.interval <= 0:
-        raise ValueError("interval must be positive")
+        raise ValueError("历元间隔必须为正数")
     if config.end < config.start:
         raise ValueError("end time cannot be earlier than start time")
 
@@ -158,7 +158,7 @@ def run_pipeline(config: PipelineConfig) -> PipelineResult:
     positioning = make_dataframe(epoch_rows, POSITIONING_COLUMNS)
     files["positioning_results"] = output / "positioning_results.csv"
     positioning.to_csv(files["positioning_results"], index=False, encoding="utf-8-sig")
-    # Compatibility with the previous GUI and module-4 naming.
+    # 兼容旧版 GUI 和模块四原有文件命名。
     positioning.to_csv(output / "module4_continuous_position_results.csv", index=False, encoding="utf-8-sig")
 
     stats = accuracy_stats(epoch_rows)
@@ -209,4 +209,3 @@ def run_pipeline(config: PipelineConfig) -> PipelineResult:
 def _mean(values) -> float:
     clean = [float(value) for value in values if value is not None and math.isfinite(float(value))]
     return sum(clean) / len(clean) if clean else math.nan
-

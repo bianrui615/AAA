@@ -1,14 +1,11 @@
-# Design Report
+# 设计报告
 
-The project is organized around five required modules:
+本项目按课程要求组织为五个模块：
 
-1. RINEX NAV parsing and pseudorange simulation.
-2. Satellite position, clock and propagation corrections.
-3. Single-epoch SPP least-squares positioning.
-4. Continuous positioning, analysis and visualization.
-5. CLI, GUI and tests.
+1. RINEX NAV 导航文件解析与伪距模拟。
+2. 卫星位置、卫星钟差和传播延迟修正。
+3. 单历元 SPP 最小二乘定位解算。
+4. 连续定位、结果分析和可视化。
+5. 命令行入口、图形界面和测试。
 
-Core GNSS formulas are implemented in Python with `numpy` used only for matrix
-operations. No RTKLIB, gnsspy, georinex or other GNSS positioning library is
-used.
-
+核心 GNSS 公式均使用 Python 手写实现，`numpy` 只用于矩阵运算。不使用 RTKLIB、gnsspy、georinex 或其他 GNSS 定位库。

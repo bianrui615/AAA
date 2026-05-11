@@ -1,2 +1,1 @@
-"""Analysis, visualization and reports."""
-
+"""分析、可视化和报告。"""

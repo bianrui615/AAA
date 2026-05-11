@@ -1,4 +1,4 @@
-"""Pseudorange simulation and preprocessing for module 1."""
+"""模块一的伪距模拟与预处理。"""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def simulate_pseudorange(
     seed: Optional[int] = None,
     elevation_mask: float = 0.0,
 ) -> object:
-    """Simulate pseudorange observations and mark preprocessing decisions."""
+    """模拟伪距观测值，并标记各项预处理筛选结果。"""
 
     raw = generate_simulated_pseudorange_records(
         satellite_positions,
@@ -118,7 +118,7 @@ def simulate_pseudorange(
 
 
 def pseudorange_dict(table) -> Dict[str, float]:
-    """Convert a pseudorange table to sat_id -> simulated pseudorange."""
+    """将伪距表转换为 sat_id -> 模拟伪距 字典。"""
 
     rows = table.to_dict("records") if hasattr(table, "to_dict") else list(table)
     return {

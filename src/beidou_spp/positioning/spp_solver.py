@@ -1,4 +1,4 @@
-"""Standard SPP entry points."""
+"""标准 SPP 解算入口。"""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def solve_epoch_spp(
     threshold: float = 1e-4,
     elevation_mask: float = 0.0,
 ) -> EpochSolution:
-    """Solve one epoch and return required public fields."""
+    """解算单个历元，并返回课程要求的公开字段。"""
 
     raw = solve_spp(
         satellite_positions,
@@ -92,4 +92,3 @@ def save_spp_epoch_result(solution: EpochSolution, output_dir: str | Path) -> Pa
     path = output / "spp_epoch_result.csv"
     make_dataframe([solution.as_dict()], SPP_COLUMNS).to_csv(path, index=False, encoding="utf-8-sig")
     return path
-

@@ -1,4 +1,4 @@
-"""Configuration objects for the Beidou SPP pipeline."""
+"""北斗 SPP 流程配置对象。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ ECEF = Tuple[float, float, float]
 
 @dataclass
 class PipelineConfig:
-    """User-facing configuration for one full positioning run."""
+    """一次完整定位流程的用户配置。"""
 
     nav: Path
     output: Path = Path("outputs")
@@ -24,4 +24,3 @@ class PipelineConfig:
     max_iter: int = 10
     threshold: float = 1e-4
     elevation_mask: float = 15.0
-

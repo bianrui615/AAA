@@ -1,4 +1,4 @@
-"""Shared models for the Beidou SPP package."""
+"""北斗 SPP 软件包共用数据模型。"""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ C = 299_792_458.0
 
 @dataclass
 class EpochSolution:
-    """Standard SPP epoch result using the required output field names."""
+    """使用课程要求字段名的标准单历元 SPP 结果。"""
 
     epoch: str
     x_m: float = math.nan
@@ -59,7 +59,7 @@ class EpochSolution:
 
 @dataclass
 class PipelineResult:
-    """Paths and high-level stats produced by a full run."""
+    """一次完整运行生成的文件路径和总体统计结果。"""
 
     output_dir: Path
     files: Dict[str, Path]
@@ -69,4 +69,3 @@ class PipelineResult:
     rms_error_m: float
     mean_error_m: float
     max_error_m: float
-

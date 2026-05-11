@@ -1,4 +1,4 @@
-"""Coordinate conversion helpers."""
+"""坐标转换工具。"""
 
 from __future__ import annotations
 
@@ -13,13 +13,13 @@ WGS84_E2 = WGS84_F * (2.0 - WGS84_F)
 
 
 def ecef_to_blh(x: float, y: float, z: float) -> Tuple[float, float, float]:
-    """Convert ECEF meters to latitude/longitude degrees and height meters."""
+    """将 ECEF 米坐标转换为纬度、经度和大地高。"""
 
     return _ecef_to_blh(x, y, z)
 
 
 def blh_to_ecef(lat_deg: float, lon_deg: float, height_m: float) -> Tuple[float, float, float]:
-    """Convert geodetic latitude/longitude/height to WGS84 ECEF meters."""
+    """将大地纬度、经度和高程转换为 WGS84 ECEF 米坐标。"""
 
     lat = math.radians(lat_deg)
     lon = math.radians(lon_deg)
@@ -30,4 +30,3 @@ def blh_to_ecef(lat_deg: float, lon_deg: float, height_m: float) -> Tuple[float,
     y = (n + height_m) * cos_lat * math.sin(lon)
     z = (n * (1.0 - WGS84_E2) + height_m) * sin_lat
     return x, y, z
-

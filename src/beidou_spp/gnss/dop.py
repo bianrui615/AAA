@@ -1,4 +1,4 @@
-"""DOP calculation utilities."""
+"""DOP 计算工具。"""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def design_matrix(satellite_positions: Dict[str, ECEF], receiver_ecef: ECEF) -> 
 
 
 def compute_dops_from_design(h_matrix: np.ndarray) -> Tuple[float, float, float, float, float]:
-    """Return GDOP, PDOP, HDOP, VDOP and TDOP from a geometry matrix."""
+    """根据几何设计矩阵返回 GDOP、PDOP、HDOP、VDOP 和 TDOP。"""
 
     if h_matrix.shape[0] < 4:
         return (math.nan, math.nan, math.nan, math.nan, math.nan)
@@ -41,4 +41,3 @@ def compute_dops_from_design(h_matrix: np.ndarray) -> Tuple[float, float, float,
 
 def compute_dops(satellite_positions: Dict[str, ECEF], receiver_ecef: ECEF) -> Tuple[float, float, float, float, float]:
     return compute_dops_from_design(design_matrix(satellite_positions, receiver_ecef))
-

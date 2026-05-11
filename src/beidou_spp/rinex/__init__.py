@@ -1,2 +1,1 @@
-"""RINEX parsing and pseudorange simulation."""
-
+"""RINEX 解析与伪距模拟。"""

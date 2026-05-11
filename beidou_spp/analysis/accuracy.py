@@ -1,4 +1,4 @@
-"""Accuracy statistics."""
+"""精度统计。"""
 
 from __future__ import annotations
 
@@ -21,4 +21,3 @@ def accuracy_stats(rows: List[Dict]) -> Dict[str, float]:
         "rms_error_m": float(math.sqrt(np.mean(np.square(errors)))),
         "max_error_m": float(max(errors)),
     }
-

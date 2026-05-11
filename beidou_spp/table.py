@@ -1,8 +1,7 @@
-"""Small table helper with optional pandas interoperability.
+"""轻量表格工具，并兼容可选的 pandas。
 
-The course allows pandas, but some classroom machines may not have it installed
-yet. Public APIs return a pandas DataFrame when pandas exists; otherwise they
-return this lightweight CSV-capable object with a compatible subset used here.
+课程允许使用 pandas，但部分机器可能尚未安装。若存在 pandas，公共接口返回
+pandas DataFrame；否则返回本文件中的轻量 CSV 表格对象。
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from typing import Dict, Iterable, Iterator, List, Sequence
 
 
 class SimpleDataFrame:
-    """Minimal DataFrame-like object used only as a no-pandas fallback."""
+    """仅在未安装 pandas 时使用的极简 DataFrame 兼容对象。"""
 
     def __init__(self, rows: Iterable[Dict], columns: Sequence[str] | None = None):
         self.rows = list(rows)
@@ -42,16 +41,16 @@ class SimpleDataFrame:
 
     def to_dict(self, orient: str = "records") -> List[Dict]:
         if orient != "records":
-            raise ValueError("SimpleDataFrame only supports orient='records'")
+            raise ValueError("SimpleDataFrame 只支持 orient='records'")
         return [dict(row) for row in self.rows]
 
 
 def make_dataframe(rows: Iterable[Dict], columns: Sequence[str] | None = None):
-    """Return pandas.DataFrame if available, otherwise SimpleDataFrame."""
+    """优先返回 pandas.DataFrame；不可用时返回 SimpleDataFrame。"""
 
     rows = list(rows)
     try:
-        import pandas as pd  # type: ignore
+        import pandas as pd
 
         return pd.DataFrame(rows, columns=columns)
     except ModuleNotFoundError:
@@ -59,9 +58,8 @@ def make_dataframe(rows: Iterable[Dict], columns: Sequence[str] | None = None):
 
 
 def records(table) -> List[Dict]:
-    """Extract records from pandas or SimpleDataFrame."""
+    """从 pandas 或 SimpleDataFrame 中取出记录列表。"""
 
     if hasattr(table, "to_dict"):
         return list(table.to_dict("records"))
     return list(table)
-

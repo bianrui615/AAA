@@ -1,4 +1,4 @@
-"""Standard figures for continuous positioning."""
+"""连续定位的标准结果图。"""
 
 from __future__ import annotations
 
@@ -20,6 +20,14 @@ def plot_standard_results(rows: List[Dict], receiver_ecef, output_dir: str | Pat
         import matplotlib.pyplot as plt
     except ModuleNotFoundError:
         return []
+    plt.rcParams["font.sans-serif"] = [
+        "Microsoft YaHei",
+        "SimHei",
+        "Noto Sans CJK SC",
+        "Arial Unicode MS",
+        "DejaVu Sans",
+    ]
+    plt.rcParams["axes.unicode_minus"] = False
 
     paths: List[Path] = []
     x_axis = list(range(len(rows)))
@@ -32,9 +40,9 @@ def plot_standard_results(rows: List[Dict], receiver_ecef, output_dir: str | Pat
 
     plt.figure(figsize=(10, 5))
     plt.plot(x_axis, errors, marker="o", linewidth=1.5)
-    plt.xlabel("Epoch index")
-    plt.ylabel("3D position error (m)")
-    plt.title("Position Error")
+    plt.xlabel("历元序号")
+    plt.ylabel("三维定位误差 (m)")
+    plt.title("定位误差曲线")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     path = output / "position_error.png"
@@ -45,11 +53,11 @@ def plot_standard_results(rows: List[Dict], receiver_ecef, output_dir: str | Pat
 
     true_lat, true_lon, _ = ecef_to_blh(*receiver_ecef)
     plt.figure(figsize=(6, 6))
-    plt.plot(lons, lats, marker="o", linewidth=1.2, label="Solved")
-    plt.scatter([true_lon], [true_lat], marker="*", s=130, label="Reference")
-    plt.xlabel("Longitude (deg)")
-    plt.ylabel("Latitude (deg)")
-    plt.title("Trajectory")
+    plt.plot(lons, lats, marker="o", linewidth=1.2, label="解算轨迹")
+    plt.scatter([true_lon], [true_lat], marker="*", s=130, label="参考位置")
+    plt.xlabel("经度 (deg)")
+    plt.ylabel("纬度 (deg)")
+    plt.title("定位轨迹")
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -60,9 +68,9 @@ def plot_standard_results(rows: List[Dict], receiver_ecef, output_dir: str | Pat
     paths.append(path)
 
     fig, ax1 = plt.subplots(figsize=(10, 5))
-    ax1.plot(x_axis, sats, marker="o", color="tab:blue", label="Satellites")
-    ax1.set_xlabel("Epoch index")
-    ax1.set_ylabel("Satellite count")
+    ax1.plot(x_axis, sats, marker="o", color="tab:blue", label="卫星数量")
+    ax1.set_xlabel("历元序号")
+    ax1.set_ylabel("卫星数量")
     ax1.grid(True, alpha=0.3)
     ax2 = ax1.twinx()
     ax2.plot(x_axis, pdops, color="tab:orange", label="PDOP")
