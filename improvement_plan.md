@@ -64,9 +64,9 @@
 
 输出文件建议：
 
-- `output/parameter_sweep_results.csv`
-- `output/parameter_sweep_report.txt`
-- `output/parameter_sweep_error.png`
+- `outputs/basic/parameter_sweep_results.csv`
+- `outputs/basic/parameter_sweep_report.txt`
+- `outputs/basic/parameter_sweep_error.png`
 
 ### P3：伪距生成模型参数化
 
@@ -191,10 +191,10 @@ Z_compensated = Z_solved - dz_pred
 
 - `ml_data_generator.py`
 - `ml_train_model.py`
-- `output/ml_features_train.csv`
-- `output/ml_features_test.csv`
-- `output/ml_model.pkl`
-- `output/ml_training_report.txt`
+- `outputs/basic/ml_features_train.csv`
+- `outputs/basic/ml_features_test.csv`
+- `outputs/basic/ml_model.pkl`
+- `outputs/basic/ml_training_report.txt`
 
 ### AI-4：补偿集成
 
@@ -217,9 +217,9 @@ Z_compensated = Z_solved - dz_pred
 
 输出：
 
-- `output/ml_compensation_comparison.csv`
-- `output/ml_error_comparison.png`
-- `output/ml_error_bar_comparison.png`
+- `outputs/basic/ml_compensation_comparison.csv`
+- `outputs/basic/ml_error_comparison.png`
+- `outputs/basic/ml_error_bar_comparison.png`
 - `docs/optional_ai_report.md`
 
 报告必须说明：

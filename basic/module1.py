@@ -958,7 +958,7 @@ def run_module1(
     receiver_approx: Tuple[float, float, float],
     epochs: List[datetime],
     seed: int,
-    output_dir: str | Path = "output",
+    output_dir: str | Path = "outputs/basic",
     elevation_mask_deg: float = 0.0,
     enable_pseudorange_outlier_filter: bool = False,
 ) -> Dict[str, Path]:
@@ -1246,7 +1246,7 @@ if __name__ == "__main__":
         receiver_approx=RECEIVER_APPROX,
         epochs=EPOCHS,
         seed=SEED,
-        output_dir="output",
+        output_dir="outputs/basic",
         elevation_mask_deg=0.0,
     )
 

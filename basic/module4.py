@@ -27,8 +27,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
-# 将 matplotlib 缓存目录放到项目 output 下，避免系统用户目录无写权限时报错。
-os.environ.setdefault("MPLCONFIGDIR", str(Path("output") / "matplotlib_cache"))
+# 将 matplotlib 缓存目录放到项目 outputs/basic 下，避免系统用户目录无写权限时报错。
+os.environ.setdefault("MPLCONFIGDIR", str(Path("outputs/basic") / "matplotlib_cache"))
 
 try:
     import matplotlib.pyplot as plt
@@ -136,7 +136,7 @@ def run_continuous_positioning(
     end_time: datetime,
     interval_seconds: int,
     receiver_true_position: ECEF,
-    output_dir: str | Path = "output",
+    output_dir: str | Path = "outputs/basic",
     random_seed: Optional[int] = 2026,
     max_iter: int = 10,
     convergence_threshold: float = 1e-4,

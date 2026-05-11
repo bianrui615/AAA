@@ -81,7 +81,7 @@ ELEVATION_MASK_DEG = 0.0
 RANDOM_SEED = 2026
 
 # 所有模块统一输出目录。
-OUTPUT_DIR = "output"
+OUTPUT_DIR = "outputs/basic"
 
 # 模块二和模块三独立输出使用的测试历元。
 TEST_EPOCH_TIME = SIMULATION_START_TIME

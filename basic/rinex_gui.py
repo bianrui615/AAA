@@ -26,7 +26,7 @@ import shutil
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-os.environ.setdefault("MPLCONFIGDIR", str(Path("output") / "matplotlib_cache"))
+os.environ.setdefault("MPLCONFIGDIR", str(Path("outputs/basic") / "matplotlib_cache"))
 
 try:
     from PyQt5.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, pyqtSignal as Signal
@@ -650,7 +650,7 @@ if QT_IMPORT_ERROR is None:
             self._refresh_error_plot()
             self._refresh_playback_controls()
             self.update_playback_plot(self.play_slider.value())
-            self.log("解算完成，CSV、统计文件和结果图已写入 output 目录。")
+            self.log("解算完成，CSV、统计文件和结果图已写入 outputs/basic 目录。")
             QMessageBox.information(self, "完成", "连续定位解算完成。")
 
         def positioning_failed(self, message: str) -> None:
@@ -685,7 +685,7 @@ if QT_IMPORT_ERROR is None:
         def export_outputs(self) -> None:
             source_dir = Path(OUTPUT_DIR)
             if not source_dir.exists():
-                QMessageBox.warning(self, "缺少输出", "当前还没有可导出的 output 目录。")
+                QMessageBox.warning(self, "缺少输出", "当前还没有可导出的 outputs/basic 目录。")
                 return
             target_name = QFileDialog.getExistingDirectory(
                 self,

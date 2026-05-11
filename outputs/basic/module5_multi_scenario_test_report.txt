@@ -21,7 +21,7 @@
   平均误差：49.648 m
   RMS 误差：61.871 m
   最大误差：138.219 m
-  输出目录：output\scenario_1_default
+  输出目录：outputs\basic\scenario_1_default
 
 场景 2：scenario_2_different_seed
 ----------------------------------------
@@ -41,7 +41,7 @@
   平均误差：29.092 m
   RMS 误差：38.855 m
   最大误差：103.459 m
-  输出目录：output\scenario_2_different_seed
+  输出目录：outputs\basic\scenario_2_different_seed
 
 场景 3：scenario_3_elevation_mask
 ----------------------------------------
@@ -61,7 +61,7 @@
   平均误差：NaN m
   RMS 误差：NaN m
   最大误差：NaN m
-  输出目录：output\scenario_3_elevation_mask
+  输出目录：outputs\basic\scenario_3_elevation_mask
 
 场景间结果对比
 ----------------------------------------

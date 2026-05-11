@@ -30,7 +30,7 @@ class ScenarioConfig:
     elevation_mask_deg: float = 0.0
 
 
-# 输出目录统一放在 outputs/enhance/，避免与基础部分 output/ 混淆
+# 输出目录统一放在 outputs/enhance/，避免与基础部分 outputs/basic/ 混淆
 BASE_OUTPUT_DIR = Path("outputs/enhance")
 SCENARIO_OUTPUT_DIR = BASE_OUTPUT_DIR / "scenarios"
 MODEL_OUTPUT_DIR = BASE_OUTPUT_DIR / "models"
