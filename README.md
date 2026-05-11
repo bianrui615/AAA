@@ -1,98 +1,143 @@
 # 北斗 SPP 全流程定位解算系统
 
-本项目实现一个纯 Python 的北斗 RINEX NAV 定位解算流程：
+本项目是一个纯 Python 实现的北斗三号（BDS-3）单点定位（SPP）全流程解算系统，包含基础定位流程与机器学习误差补偿两个层次。
 
-1. 解析 RINEX 导航文件，并生成模拟伪距观测值。
-2. 根据广播星历计算卫星 ECEF 坐标和卫星钟差。
-3. 使用卫星钟差、简化电离层模型和 Saastamoinen 对流层模型修正伪距。
-4. 使用迭代最小二乘完成伪距单点定位。
-5. 完成连续定位、精度分析、可视化、图形界面和测试。
+## 项目特点
 
-核心 GNSS 算法均为手写实现，不调用 RTKLIB、gnsspy、georinex 等第三方 GNSS 定位库。
+- **输入格式**：默认解析 BDS-3 CNAV 导航电文（如 `.26b_cnav`、`.cnav`），不依赖 `.obs` 观测文件。
+- **伪距模拟**：基于广播星历和误差模型生成模拟伪距，不读取真实观测伪距。
+- **算法自主**：核心 GNSS 算法（星历解析、卫星位置计算、迭代最小二乘 SPP）均为手写实现，不调用 RTKLIB、georinex 等第三方 GNSS 库。
+- **双层架构**：
+  - `basic/`：基础定位模块（模块一至五），完成从 NAV 解析到连续定位的全流程；
+  - `enhance/`：提高部分，利用线性回归与随机森林对 SPP 定位误差进行建模与补偿。
+
+## 项目结构
+
+```
+├── basic/                      # 基础定位模块
+│   ├── module1.py              # 模块一：NAV 导航文件解析 + 模拟伪距生成
+│   ├── module2.py              # 模块二：卫星位置/钟差计算
+│   ├── module3.py              # 模块三：伪距生成与单点定位解算
+│   ├── module4.py              # 模块四：连续定位与结果分析
+│   ├── module5.py              # 模块五：系统整合与测试（主入口）
+│   └── rinex_gui.py            # 图形界面
+├── enhance/                    # 提高部分（机器学习误差补偿）
+│   ├── enhance_config.py       # 场景与特征配置
+│   ├── dataset_builder.py      # 构建机器学习数据集
+│   ├── train_models.py         # 模型训练
+│   ├── compensate.py           # 误差预测与坐标补偿
+│   ├── evaluate_models.py      # 效果评估与可视化
+│   ├── run_enhance.py          # 提高部分统一入口
+│   └── README_enhance.md       # 提高部分详细说明
+├── nav/                        # 导航文件存放目录
+│   └── tarc0910.26b_cnav       # 默认 BDS-3 CNAV 文件
+├── outputs/                    # 所有输出目录
+│   ├── basic/                  # 基础部分输出
+│   └── enhance/                # 提高部分输出
+├── README.md                   # 本文件
+└── requirements.txt            # 依赖列表
+```
 
 ## 环境依赖
 
-```powershell
-pip install numpy matplotlib PyQt5
-```
-
-## 命令行运行
+### 基础部分
 
 ```powershell
-python basic/module5.py
+pip install numpy matplotlib
 ```
 
-默认使用 `nav/tarc0910.26b_cnav` 作为导航文件。可在 `basic/module5.py` 中修改 `NAV_FILE_PATH` 等参数。
-
-## 图形界面
+图形界面（可选）需要额外安装：
 
 ```powershell
-python basic/rinex_gui.py
+pip install PyQt5
 ```
 
-图形界面支持导入 NAV 文件、设置解算参数和接收机坐标、运行定位、查看结果表格与图像，并导出生成的结果文件。
-
-GUI 默认打开 `nav/` 目录，支持选择 `*.26b_cnav`、`*.cnav` 等格式的 RINEX NAV 文件。
-
-## 主要输出文件
-
-模块一：
-- `outputs/basic/module1_ephemeris_list.csv`
-- `outputs/basic/module1_nav_parse_summary.txt`
-
-模块二：
-- `outputs/basic/module2_satellite_position_clock.csv`
-- `outputs/basic/module2_satellite_position_summary.txt`
-- `outputs/basic/module2_pseudorange_correction_debug.csv`（调试文件，展示 rho、卫星钟差、各项误差与模拟伪距之间的关系，不作为模块三 SPP 解算输入）
-
-模块三：
-- `outputs/basic/module3_pseudorange_single_epoch.csv`
-- `outputs/basic/module3_spp_result_single_epoch.txt`
-
-模块四：
-- `outputs/basic/module4_continuous_position_results.csv`
-- `outputs/basic/module4_error_statistics.txt`
-- `outputs/basic/module4_error_curve.png`
-- `outputs/basic/module4_trajectory.png`
-- `outputs/basic/module4_satellite_dop_curve.png`
-
-模块五：
-- `outputs/basic/module5_system_test_report.txt`
-
-## 提高部分
-
-项目提供独立的机器学习误差补偿模块，位于 `enhance/` 目录下。
-
-### 运行命令
-
-```powershell
-python enhance/run_enhance.py
-```
-
-### 额外依赖
+### 提高部分
 
 ```powershell
 pip install scikit-learn joblib
 ```
 
-（若代码中使用 pandas，也需安装：`pip install pandas`）
+## 快速开始
 
-### 功能说明
+### 1. 运行基础部分
 
-提高部分会同时训练两个模型：
-- **LinearRegression**（线性回归）
-- **RandomForestRegressor**（随机森林）
+```powershell
+python basic/module5.py
+```
 
-对基础模块的 SPP 定位结果进行误差预测与坐标补偿，并输出补偿前后效果对比。
+基础部分主入口为 `basic/module5.py`，默认使用 `nav/tarc0910.26b_cnav`。运行后会自动执行：
 
-### 输出目录
+1. 解析 NAV 导航文件（按 BDS-3 CNAV 格式）；
+2. 计算卫星位置与钟差；
+3. 生成模拟伪距并进行单历元 SPP 解算；
+4. 执行连续定位与结果分析；
+5. 输出系统测试报告。
 
-提高部分所有输出统一放在 `outputs/enhance/`：
+可在 `basic/module5.py` 中修改 `NAV_FILE_PATH`、`RECEIVER_TRUE_POSITION`、`SIMULATION_START_TIME` 等参数。
+
+### 2. 运行图形界面（可选）
+
+```powershell
+python basic/rinex_gui.py
+```
+
+GUI 支持导入 NAV 文件、设置解算参数与接收机坐标、运行定位、查看结果表格与图像，并导出生成的结果文件。
+
+### 3. 运行提高部分
+
+```powershell
+python enhance/run_enhance.py
+```
+
+提高部分会自动调用基础模块生成多场景定位数据，训练 `LinearRegression` 与 `RandomForestRegressor` 两个模型，对 SPP 坐标进行误差补偿，并输出补偿效果对比、可视化图表与技术报告。
+
+详细说明见 `enhance/README_enhance.md`。
+
+## 基础部分输出文件
+
+运行 `python basic/module5.py` 后，输出统一存放在 `outputs/basic/`：
+
+**模块一**
+- `outputs/basic/module1_parsed_nav_debug.csv` — 星历解析调试数据
+- `outputs/basic/module1_simulated_pseudorange.csv` — 模拟伪距明细
+- `outputs/basic/module1_nav_parse_summary.txt` — 解析摘要
+
+**模块二**
+- `outputs/basic/module2_satellite_position_clock.csv` — 卫星位置与钟差
+- `outputs/basic/module2_satellite_position_summary.txt` — 计算摘要
+- `outputs/basic/module2_pseudorange_correction_debug.csv` — 伪距修正调试文件（仅用于展示 rho、卫星钟差、各项误差与模拟伪距之间的关系，**不参与 SPP 解算**）
+
+**模块三**
+- `outputs/basic/module3_pseudorange_single_epoch.csv` — 单历元伪距明细
+- `outputs/basic/module3_spp_result_single_epoch.txt` — 单历元 SPP 解算报告
+
+**模块四**
+- `outputs/basic/module4_continuous_position_results.csv` — 连续定位结果
+- `outputs/basic/module4_error_statistics.txt` — 误差统计
+- `outputs/basic/module4_error_curve.png` — 误差曲线
+- `outputs/basic/module4_trajectory.png` — 经纬度轨迹图
+- `outputs/basic/module4_satellite_dop_curve.png` — 卫星数与 DOP 曲线
+
+**模块五**
+- `outputs/basic/module5_system_test_report.txt` — 系统整合与测试报告
+
+当 `ENABLE_MULTI_SCENARIO_TEST = True` 时，还会输出：
+- `outputs/basic/module5_multi_scenario_summary.csv`
+- `outputs/basic/module5_multi_scenario_test_report.txt`
+- `outputs/basic/scenario_1_default/...`
+- `outputs/basic/scenario_2_different_seed/...`
+- `outputs/basic/scenario_3_elevation_mask/...`
+
+## 提高部分输出文件
+
+运行 `python enhance/run_enhance.py` 后，输出统一存放在 `outputs/enhance/`：
+
 - `ml_dataset.csv` — 机器学习数据集
 - `models/linear_regression_model.joblib` — 线性回归模型
 - `models/random_forest_model.joblib` — 随机森林模型
-- `predictions/linear_regression_predictions.csv` — 线性回归补偿预测结果
-- `predictions/random_forest_predictions.csv` — 随机森林补偿预测结果
+- `predictions/linear_regression_predictions.csv` — 线性回归补偿结果
+- `predictions/random_forest_predictions.csv` — 随机森林补偿结果
 - `model_comparison_summary.csv` — 模型对比指标
 - `ml_compensation_statistics.txt` — 补偿统计报告
 - `figures/error_curve_linear_regression.png` — 误差曲线
@@ -101,11 +146,15 @@ pip install scikit-learn joblib
 - `figures/predicted_vs_true_error.png` — 预测误差散点图
 - `ml_technical_report.txt` — 技术报告
 
-> 注意：`basic/` 为基础部分，`enhance/` 为提高部分，两者输出目录相互独立。
-
 ## 导航文件
 
 RINEX NAV 导航文件统一放在项目根目录下的 `nav/` 文件夹中：
 - `nav/tarc0910.26b_cnav`（默认文件）
 
-文件格式为 RINEX 3.x 北斗导航电文（CNAV），解析器同时兼容 `.26b` 等历史扩展名。
+文件格式为 RINEX 3.x 北斗三号 CNAV 导航电文。解析器不再根据后缀判断文件类型，`.26b_cnav`、`.cnav`、无后缀文件均统一按 CNAV 格式解析。
+
+## 注意事项
+
+1. **不读取 .obs 文件**：本项目使用模拟伪距，不依赖真实观测文件。
+2. **数据格式**：默认按 BDS-3 CNAV 格式解析，仅保留北斗三号卫星（PRN >= 19）。
+3. **输出隔离**：`outputs/basic/` 与 `outputs/enhance/` 相互独立，分别存放基础部分与提高部分的输出结果。
