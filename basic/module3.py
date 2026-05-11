@@ -20,14 +20,16 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from basic.module1 import (
+    compute_elevation as satellite_elevation_deg,
+    compute_geometric_range as geometric_distance,
+    ecef_to_blh,
+)
+
 
 ECEF = Tuple[float, float, float]
 C = 299_792_458.0
 
-# WGS84 椭球常数，用于 ECEF 转经纬高。
-WGS84_A = 6378137.0
-WGS84_F = 1.0 / 298.257223563
-WGS84_E2 = WGS84_F * (2.0 - WGS84_F)
 MIN_ELEVATION_FOR_DELAY_DEG = 5.0
 
 
@@ -56,31 +58,6 @@ def filter_healthy_satellites(
         for sat_id, position in satellite_positions.items()
         if _is_satellite_healthy(sat_id, satellite_health)
     }
-
-
-def satellite_elevation_deg(sat_position: ECEF, receiver_position: ECEF) -> float:
-    """计算卫星相对接收机的高度角，单位为 deg。"""
-
-    lat_deg, lon_deg, _ = ecef_to_blh(*receiver_position)
-    lat = math.radians(lat_deg)
-    lon = math.radians(lon_deg)
-    dx = sat_position[0] - receiver_position[0]
-    dy = sat_position[1] - receiver_position[1]
-    dz = sat_position[2] - receiver_position[2]
-
-    east = -math.sin(lon) * dx + math.cos(lon) * dy
-    north = (
-        -math.sin(lat) * math.cos(lon) * dx
-        - math.sin(lat) * math.sin(lon) * dy
-        + math.cos(lat) * dz
-    )
-    up = (
-        math.cos(lat) * math.cos(lon) * dx
-        + math.cos(lat) * math.sin(lon) * dy
-        + math.sin(lat) * dz
-    )
-    horizontal = math.sqrt(east * east + north * north)
-    return math.degrees(math.atan2(up, horizontal))
 
 
 def _delay_mapping_sin(elevation_deg: float) -> float:
@@ -136,15 +113,6 @@ class SppSolution:
     rejected_outliers: int = 0
     elevation_mask_deg: float = 0.0
     message: str = ""
-
-
-def geometric_distance(sat_position: ECEF, receiver_position: ECEF) -> float:
-    """计算卫星到接收机的几何距离 rho，单位 m。"""
-
-    dx = sat_position[0] - receiver_position[0]
-    dy = sat_position[1] - receiver_position[1]
-    dz = sat_position[2] - receiver_position[2]
-    return math.sqrt(dx * dx + dy * dy + dz * dz)
 
 
 def generate_simulated_pseudorange_record(
@@ -301,33 +269,6 @@ def generate_simulated_pseudoranges(
         satellite_clock_biases=None,
     )
     return pseudorange_records_to_dict(records)
-
-
-def ecef_to_blh(x: float, y: float, z: float) -> Tuple[float, float, float]:
-    """将 WGS84 ECEF 坐标转换为经纬高。
-
-    返回值为 (lat, lon, height)，纬度和经度单位为度，高程单位为米。
-    """
-
-    lon = math.atan2(y, x)
-    p = math.sqrt(x * x + y * y)
-    lat = math.atan2(z, p * (1.0 - WGS84_E2))
-
-    # 迭代求解大地纬度和高程。
-    for _ in range(20):
-        sin_lat = math.sin(lat)
-        n = WGS84_A / math.sqrt(1.0 - WGS84_E2 * sin_lat * sin_lat)
-        height = p / max(math.cos(lat), 1e-15) - n
-        next_lat = math.atan2(z, p * (1.0 - WGS84_E2 * n / (n + height)))
-        if abs(next_lat - lat) < 1e-12:
-            lat = next_lat
-            break
-        lat = next_lat
-
-    sin_lat = math.sin(lat)
-    n = WGS84_A / math.sqrt(1.0 - WGS84_E2 * sin_lat * sin_lat)
-    height = p / max(math.cos(lat), 1e-15) - n
-    return math.degrees(lat), math.degrees(lon), height
 
 
 def _compute_dops(design_matrix: np.ndarray) -> Tuple[float, float]:

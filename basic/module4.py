@@ -46,13 +46,17 @@ if plt is not None:
     ]
     plt.rcParams["axes.unicode_minus"] = False
 
-from basic.module1 import BroadcastEphemeris, select_ephemeris
-from basic.module2 import calculate_satellite_position_clock
+from basic.module1 import (
+    BroadcastEphemeris,
+    compute_geometric_range,
+    compute_satellite_clock_bias,
+    compute_satellite_position,
+    ecef_to_blh,
+    select_ephemeris,
+)
 from basic.module3 import (
     ECEF,
-    ecef_to_blh,
     generate_simulated_pseudorange_records,
-    geometric_distance,
     pseudorange_records_to_dict,
     solve_spp,
 )
@@ -105,7 +109,11 @@ def _collect_satellite_positions(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     epoch_time: datetime,
 ) -> Tuple[Dict[str, ECEF], Dict[str, float]]:
-    """为当前历元选择健康星历，并计算卫星 ECEF 坐标和钟差。"""
+    """为当前历元选择健康星历，并计算卫星 ECEF 坐标和钟差。
+
+    底层实现调用 module1 的 compute_satellite_position 和
+    compute_satellite_clock_bias。
+    """
 
     satellite_positions: Dict[str, ECEF] = {}
     satellite_clock_biases: Dict[str, float] = {}
@@ -114,16 +122,15 @@ def _collect_satellite_positions(
         if eph is None:
             continue
         try:
-            state = calculate_satellite_position_clock(
-                eph,
-                epoch_time,
-                raise_on_abnormal=False,
-            )
+            x, y, z = compute_satellite_position(eph, epoch_time)
+            clock_bias, _ = compute_satellite_clock_bias(eph, epoch_time)
+            position_norm = math.sqrt(x * x + y * y + z * z)
+            if position_norm <= 0.0:
+                continue
+            satellite_positions[sat_id] = (x, y, z)
+            satellite_clock_biases[sat_id] = clock_bias
         except Exception:
             continue
-        if state.status in {"计算成功", "卫星坐标数量级异常"}:
-            satellite_positions[sat_id] = state.position
-            satellite_clock_biases[sat_id] = state.clock_bias
     return satellite_positions, satellite_clock_biases
 
 
@@ -204,7 +211,7 @@ def run_continuous_positioning(
 
         if solution.converged:
             previous_solution = (solution.x, solution.y, solution.z)
-            error_3d = geometric_distance(previous_solution, receiver_true_position)
+            error_3d = compute_geometric_range(previous_solution, receiver_true_position)
             status = "成功"
             failure_reason = ""
         else:

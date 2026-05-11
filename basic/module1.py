@@ -1,26 +1,56 @@
 """
 module1.py
 
-模块一：RINEX NAV 导航文件解析模块。
+模块一：RINEX NAV 导航文件解析 + 模拟伪距生成模块。
 
-本模块只读取 RINEX NAV 导航文件，不读取 OBS 观测文件。解析时只保留
-北斗三号卫星（卫星编号以 C 开头且 PRN >= 19，例如 C19、C20、C21）。
-模块支持 RINEX 3.x 常见导航文件格式，并兼容科学计数法中的 D/E 指数
-写法，例如 1.23D-04。
+功能：
+1. 解析 RINEX NAV 导航文件，提取北斗三号卫星广播星历参数；
+2. 基于星历计算卫星 ECEF 坐标；
+3. 计算几何距离 rho 和卫星高度角；
+4. 按误差模型生成模拟伪距观测值；
+5. 数据预处理：健康筛选、高度角筛选、伪距粗差剔除；
+6. 输出解析调试 CSV 和模拟伪距 CSV。
+
+约束：
+- 不读取 OBS 观测文件；
+- 不使用真实观测伪距；
+- 所有距离单位为米，时间单位为秒；
+- 支持随机种子 seed，保证结果可复现。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 import csv
+import math
+import random
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
-# RINEX 文件中的数字经常写成 1.234D-04 或 1.234E-04。
-# 这个正则表达式用于从一行文本中提取整数、小数和 D/E 科学计数法数字。
+# ============================================================================
+# 常量定义（从 module2 迁移）
+# ============================================================================
+MU = 3.986004418e14  # 地球引力常数，单位 m^3/s^2
+OMEGA_E = 7.2921150e-5  # 地球自转角速度，单位 rad/s
+C = 299_792_458.0  # 光速，单位 m/s
+
+BDT_EPOCH = datetime(2006, 1, 1, 0, 0, 0)  # 北斗时起点近似
+SECONDS_IN_WEEK = 604_800.0
+HALF_WEEK = 302_400.0
+RELATIVITY_F = -2.0 * math.sqrt(MU) / (C * C)
+
+# WGS84 椭球常数（从 module3 迁移）
+WGS84_A = 6378137.0
+WGS84_F = 1.0 / 298.257223563
+WGS84_E2 = WGS84_F * (2.0 - WGS84_F)
+
+
+# ============================================================================
+# RINEX 解析辅助
+# ============================================================================
 _FLOAT_PATTERN = re.compile(
     r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[DEde][+-]?\d+)?"
 )
@@ -43,7 +73,7 @@ class BroadcastEphemeris:
     af1: float  # 卫星钟差多项式一次项，单位 s/s
     af2: float  # 卫星钟差多项式二次项，单位 s/s^2
 
-    aode: float  # 星历数据龄期，BDS 中常称 AODE
+    aode: float  # 星历数据龄期
     crs: float  # 轨道半径正弦调和改正项，单位 m
     delta_n: float  # 平均角速度改正量，单位 rad/s
     m0: float  # 参考时刻平近点角，单位 rad
@@ -64,15 +94,15 @@ class BroadcastEphemeris:
     omega_dot: float  # 升交点赤经变化率，单位 rad/s
 
     idot: float  # 轨道倾角变化率，单位 rad/s
-    data_source: float  # 数据源或码标志，不同 RINEX 生成器含义可能略有差异
+    data_source: float
     week: float  # BDS 周数
-    accuracy: float  # 用户测距精度或 SISAI 指示值
+    accuracy: float
 
     health: float  # 卫星健康状态，通常 0 表示健康
     tgd1: float  # BDS TGD1 群延迟，单位 s
     tgd2: float  # BDS TGD2 群延迟，单位 s
     transmission_time: float  # 电文发射时刻，BDS 周内秒
-    fit_interval: float = 0.0  # 拟合区间，部分文件中可能为空
+    fit_interval: float = 0.0
 
 
 @dataclass
@@ -90,26 +120,16 @@ class NavParseInfo:
 
 def _rinex_float(text: str) -> float:
     """将 RINEX 数字字符串转为 float，兼容 D/E 指数。"""
-
     return float(text.replace("D", "E").replace("d", "E"))
 
 
 def _extract_floats(line: str) -> List[float]:
     """从一行 RINEX 文本中提取所有浮点数。"""
-
     return [_rinex_float(token) for token in _FLOAT_PATTERN.findall(line)]
 
 
 def _parse_epoch_from_first_line(line: str) -> datetime:
-    """解析 RINEX 3.x 导航记录首行中的星历钟参考时间 toc。
-
-    常见首行格式为：
-    sat yyyy mm dd hh mm ss af0 af1 af2
-
-    有些文件在秒和 af0 之间没有额外空格，因此这里对时间字段使用固定列
-    读取，比直接 split 更稳健。
-    """
-
+    """解析 RINEX 3.x 导航记录首行中的星历钟参考时间 toc。"""
     year = int(line[4:8])
     month = int(line[9:11])
     day = int(line[12:14])
@@ -122,7 +142,6 @@ def _parse_epoch_from_first_line(line: str) -> datetime:
 
 def _build_ephemeris(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
     """将 8 行 RINEX 3.x BDS 导航记录转换为 BroadcastEphemeris。"""
-
     if len(record_lines) < 8:
         return None
 
@@ -143,9 +162,6 @@ def _build_ephemeris(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
     if len(clock_values) < 3:
         raise ValueError(f"{sat_id} {toc} 的卫星钟差字段不完整")
 
-    # RINEX 3 BDS/GPS 类导航记录首行之后通常有 26 个数值字段，排列为：
-    # 4+4+4+4+4+4+2。不同软件生成的文件可能会在末尾追加空字段，本程序只
-    # 使用前 26 个必要字段，缺失的末尾字段用 0.0 补齐。
     values: List[float] = []
     for line in record_lines[1:8]:
         values.extend(_extract_floats(line[3:]))
@@ -190,8 +206,7 @@ def _build_ephemeris(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
 def parse_rinex_nav_with_info(
     nav_file: str | Path,
 ) -> Tuple[Dict[str, List[BroadcastEphemeris]], NavParseInfo]:
-    """解析 RINEX NAV 文件，并返回北斗星历和解析统计信息。"""
-
+    """解析 RINEX NAV 文件，并返回北斗三号星历和解析统计信息。"""
     path = Path(nav_file)
     info = NavParseInfo(nav_file_path=str(path))
     if not path.exists():
@@ -254,8 +269,7 @@ def parse_rinex_nav_with_info(
 
 
 def parse_rinex_nav(nav_file: str | Path) -> Dict[str, List[BroadcastEphemeris]]:
-    """解析 RINEX NAV 文件，只返回北斗广播星历字典。"""
-
+    """解析 RINEX NAV 文件，只返回北斗三号广播星历字典。"""
     nav_data, _ = parse_rinex_nav_with_info(nav_file)
     return nav_data
 
@@ -267,7 +281,6 @@ def select_ephemeris(
     healthy_only: bool = False,
 ) -> Optional[BroadcastEphemeris]:
     """为指定卫星和历元选择 toc 时间最接近的星历。"""
-
     eph_list = nav_data.get(sat_id)
     if not eph_list:
         return None
@@ -278,71 +291,515 @@ def select_ephemeris(
     return min(eph_list, key=lambda eph: abs((epoch_time - eph.toc).total_seconds()))
 
 
-def save_nav_parse_outputs(
-    nav_data: Dict[str, List[BroadcastEphemeris]],
-    output_dir: str | Path,
-    parse_info: Optional[NavParseInfo] = None,
-    nav_file_path: str | Path | None = None,
-) -> Dict[str, Path]:
-    """保存模块一输出：解析摘要 TXT 和星历明细 CSV。"""
+# ============================================================================
+# 卫星位置计算（从 module2 迁移）
+# ============================================================================
+def _bds_seconds_of_week(epoch_time: datetime) -> float:
+    """将 datetime 转换为 BDS 周内秒。"""
+    total_seconds = (epoch_time - BDT_EPOCH).total_seconds()
+    return total_seconds % SECONDS_IN_WEEK
 
+
+def _normalize_time(seconds: float) -> float:
+    """将时间差归化到半周范围，避免跨周时出现过大的时间差。"""
+    if seconds > HALF_WEEK:
+        seconds -= SECONDS_IN_WEEK
+    elif seconds < -HALF_WEEK:
+        seconds += SECONDS_IN_WEEK
+    return seconds
+
+
+def _solve_kepler(mean_anomaly: float, eccentricity: float, max_iter: int, tol: float) -> float:
+    """迭代求解 Kepler 方程 E = M + e * sin(E)。"""
+    eccentric_anomaly = mean_anomaly
+    for _ in range(max_iter):
+        next_value = mean_anomaly + eccentricity * math.sin(eccentric_anomaly)
+        if abs(next_value - eccentric_anomaly) < tol:
+            return next_value
+        eccentric_anomaly = next_value
+    return eccentric_anomaly
+
+
+def _is_bds_geo(sat_id: str) -> bool:
+    """粗略判断北斗 GEO 卫星。"""
+    try:
+        prn = int(sat_id[1:])
+    except ValueError:
+        return False
+    return 1 <= prn <= 5 or 59 <= prn <= 63
+
+
+def compute_satellite_position(
+    eph: BroadcastEphemeris,
+    epoch_time: datetime,
+) -> Tuple[float, float, float]:
+    """基于广播星历计算卫星 ECEF 坐标。
+
+    返回 (sat_x, sat_y, sat_z)，单位为米。
+    算法依据：北斗 ICD 文件广播星历标准公式。
+    """
+    if eph.sqrt_a <= 0.0:
+        raise ValueError(f"{eph.sat_id} 的 sqrtA 非法：{eph.sqrt_a}")
+
+    t = _bds_seconds_of_week(epoch_time)
+    tk = _normalize_time(t - eph.toe)
+
+    semi_major_axis = eph.sqrt_a * eph.sqrt_a
+    mean_motion_0 = math.sqrt(MU / (semi_major_axis ** 3))
+    mean_motion = mean_motion_0 + eph.delta_n
+
+    mean_anomaly = math.fmod(eph.m0 + mean_motion * tk, 2.0 * math.pi)
+    eccentric_anomaly = _solve_kepler(mean_anomaly, eph.eccentricity, 30, 1e-13)
+
+    sin_e = math.sin(eccentric_anomaly)
+    cos_e = math.cos(eccentric_anomaly)
+
+    true_anomaly = math.atan2(
+        math.sqrt(1.0 - eph.eccentricity * eph.eccentricity) * sin_e,
+        cos_e - eph.eccentricity,
+    )
+    phi = true_anomaly + eph.omega
+
+    sin_2phi = math.sin(2.0 * phi)
+    cos_2phi = math.cos(2.0 * phi)
+    delta_u = eph.cus * sin_2phi + eph.cuc * cos_2phi
+    delta_r = eph.crs * sin_2phi + eph.crc * cos_2phi
+    delta_i = eph.cis * sin_2phi + eph.cic * cos_2phi
+
+    u = phi + delta_u
+    r = semi_major_axis * (1.0 - eph.eccentricity * cos_e) + delta_r
+    i = eph.i0 + eph.idot * tk + delta_i
+
+    x_orb = r * math.cos(u)
+    y_orb = r * math.sin(u)
+
+    if _is_bds_geo(eph.sat_id):
+        omega_k = eph.omega0 + eph.omega_dot * tk - OMEGA_E * eph.toe
+        x_g = x_orb * math.cos(omega_k) - y_orb * math.cos(i) * math.sin(omega_k)
+        y_g = x_orb * math.sin(omega_k) + y_orb * math.cos(i) * math.cos(omega_k)
+        z_g = y_orb * math.sin(i)
+
+        geo_tilt = math.radians(-5.0)
+        x_t = x_g
+        y_t = y_g * math.cos(geo_tilt) + z_g * math.sin(geo_tilt)
+        z_t = -y_g * math.sin(geo_tilt) + z_g * math.cos(geo_tilt)
+
+        cos_rot = math.cos(OMEGA_E * tk)
+        sin_rot = math.sin(OMEGA_E * tk)
+        x = x_t * cos_rot + y_t * sin_rot
+        y = -x_t * sin_rot + y_t * cos_rot
+        z = z_t
+    else:
+        omega_k = eph.omega0 + (eph.omega_dot - OMEGA_E) * tk - OMEGA_E * eph.toe
+        x = x_orb * math.cos(omega_k) - y_orb * math.cos(i) * math.sin(omega_k)
+        y = x_orb * math.sin(omega_k) + y_orb * math.cos(i) * math.cos(omega_k)
+        z = y_orb * math.sin(i)
+
+    return x, y, z
+
+
+def compute_satellite_clock_bias(
+    eph: BroadcastEphemeris,
+    epoch_time: datetime,
+) -> Tuple[float, float]:
+    """基于广播星历计算卫星钟差（单位：秒）和相对论效应修正（单位：秒）。
+
+    返回 (clock_bias, relativistic_correction)。
+    钟差 = af0 + af1 * dt + af2 * dt^2 + 相对论效应修正
+    """
+    dt_clock = _normalize_time((epoch_time - eph.toc).total_seconds())
+
+    # 偏近点角 E 需要重新计算（与位置计算中一致）
+    t = _bds_seconds_of_week(epoch_time)
+    tk = _normalize_time(t - eph.toe)
+    semi_major_axis = eph.sqrt_a * eph.sqrt_a
+    mean_motion_0 = math.sqrt(MU / (semi_major_axis ** 3))
+    mean_motion = mean_motion_0 + eph.delta_n
+    mean_anomaly = math.fmod(eph.m0 + mean_motion * tk, 2.0 * math.pi)
+    eccentric_anomaly = _solve_kepler(mean_anomaly, eph.eccentricity, 30, 1e-13)
+    sin_e = math.sin(eccentric_anomaly)
+
+    relativity = RELATIVITY_F * eph.eccentricity * eph.sqrt_a * sin_e
+    clock_bias = eph.af0 + eph.af1 * dt_clock + eph.af2 * dt_clock * dt_clock + relativity
+    return clock_bias, relativity
+
+
+# ============================================================================
+# 几何距离与高度角计算（从 module3 迁移）
+# ============================================================================
+def ecef_to_blh(x: float, y: float, z: float) -> Tuple[float, float, float]:
+    """将 WGS84 ECEF 坐标转换为经纬高。
+
+    返回值为 (lat, lon, height)，纬度和经度单位为度，高程单位为米。
+    """
+    lon = math.atan2(y, x)
+    p = math.sqrt(x * x + y * y)
+    lat = math.atan2(z, p * (1.0 - WGS84_E2))
+
+    for _ in range(20):
+        sin_lat = math.sin(lat)
+        n = WGS84_A / math.sqrt(1.0 - WGS84_E2 * sin_lat * sin_lat)
+        height = p / max(math.cos(lat), 1e-15) - n
+        next_lat = math.atan2(z, p * (1.0 - WGS84_E2 * n / (n + height)))
+        if abs(next_lat - lat) < 1e-12:
+            lat = next_lat
+            break
+        lat = next_lat
+
+    sin_lat = math.sin(lat)
+    n = WGS84_A / math.sqrt(1.0 - WGS84_E2 * sin_lat * sin_lat)
+    height = p / max(math.cos(lat), 1e-15) - n
+    return math.degrees(lat), math.degrees(lon), height
+
+
+def compute_geometric_range(
+    receiver_xyz: Tuple[float, float, float],
+    satellite_xyz: Tuple[float, float, float],
+) -> float:
+    """计算卫星到接收机的几何距离 rho，单位 m。"""
+    dx = satellite_xyz[0] - receiver_xyz[0]
+    dy = satellite_xyz[1] - receiver_xyz[1]
+    dz = satellite_xyz[2] - receiver_xyz[2]
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+
+def compute_elevation(
+    receiver_xyz: Tuple[float, float, float],
+    satellite_xyz: Tuple[float, float, float],
+) -> float:
+    """计算卫星相对接收机的高度角，单位为度。"""
+    lat_deg, lon_deg, _ = ecef_to_blh(*receiver_xyz)
+    lat = math.radians(lat_deg)
+    lon = math.radians(lon_deg)
+    dx = satellite_xyz[0] - receiver_xyz[0]
+    dy = satellite_xyz[1] - receiver_xyz[1]
+    dz = satellite_xyz[2] - receiver_xyz[2]
+
+    east = -math.sin(lon) * dx + math.cos(lon) * dy
+    north = (
+        -math.sin(lat) * math.cos(lon) * dx
+        - math.sin(lat) * math.sin(lon) * dy
+        + math.cos(lat) * dz
+    )
+    up = (
+        math.cos(lat) * math.cos(lon) * dx
+        + math.cos(lat) * math.sin(lon) * dy
+        + math.sin(lat) * dz
+    )
+    horizontal = math.sqrt(east * east + north * north)
+    return math.degrees(math.atan2(up, horizontal))
+
+
+# ============================================================================
+# 伪距模拟（从 module3 迁移改造）
+# ============================================================================
+def simulate_pseudorange(rho: float, rng: random.Random) -> dict:
+    """按误差模型生成模拟伪距，并保存每一项误差。
+
+    误差模型：
+        P = rho
+            + random.gauss(0, 0.5)       # SISRE
+            + random.gauss(10, 3)        # 电离层误差
+            + random.gauss(4, 1.5)       # 对流层误差
+            + (60 + random.gauss(0, 12)) # 接收机钟差
+            + random.gauss(0, 0.3)       # 观测噪声
+
+    参数:
+        rho: 几何距离，单位 m
+        rng: random.Random 实例，保证可复现性
+
+    返回:
+        包含各误差项和最终伪距的字典
+    """
+    sisre_error = rng.gauss(0.0, 0.5)
+    iono_error = rng.gauss(10.0, 3.0)
+    tropo_error = rng.gauss(4.0, 1.5)
+    receiver_clock_error = 60.0 + rng.gauss(0.0, 12.0)
+    noise_error = rng.gauss(0.0, 0.3)
+    pseudorange = (
+        rho
+        + sisre_error
+        + iono_error
+        + tropo_error
+        + receiver_clock_error
+        + noise_error
+    )
+
+    return {
+        "rho": rho,
+        "sisre_error": sisre_error,
+        "iono_error": iono_error,
+        "tropo_error": tropo_error,
+        "receiver_clock_error": receiver_clock_error,
+        "noise_error": noise_error,
+        "pseudorange": pseudorange,
+    }
+
+
+# ============================================================================
+# 预处理与过滤
+# ============================================================================
+def preprocess_pseudorange_records(
+    records: List[dict],
+    elevation_mask_deg: float = 0.0,
+    enable_outlier_filter: bool = False,
+    outlier_threshold_m: Optional[float] = None,
+) -> List[dict]:
+    """对模拟伪距记录进行预处理过滤。
+
+    过滤规则（按优先级）：
+    1. 不健康卫星（health != 0）→ reject_reason = "unhealthy"
+    2. 高度角低于阈值 → reject_reason = "low_elevation"
+    3. 伪距超出合理范围 [15M, 50M] m → reject_reason = "range_outlier"
+       （仅在 enable_outlier_filter=True 时执行）
+    4. 相对中位数偏差过大 → reject_reason = "statistical_outlier"
+       （仅在 enable_outlier_filter=True 且 outlier_threshold_m 不为 None 时执行）
+
+    被剔除的数据保留在返回列表中，is_used 标记为 False。
+    """
+    if not records:
+        return []
+
+    # 收集所有伪距用于统计（仅在启用粗差筛选时计算）
+    median_p = 0.0
+    if enable_outlier_filter and outlier_threshold_m is not None and outlier_threshold_m > 0:
+        pseudorange_values = [r["pseudorange"] for r in records]
+        median_p = float(sorted(pseudorange_values)[len(pseudorange_values) // 2]) if pseudorange_values else 0.0
+
+    processed: List[dict] = []
+    for rec in records:
+        rec = dict(rec)  # 复制，避免修改原数据
+        rec["is_used"] = True
+        rec["reject_reason"] = ""
+
+        # 1. 健康筛选（始终执行）
+        health = rec.get("health", 0.0)
+        if health not in ("", None) and int(round(float(health))) != 0:
+            rec["is_used"] = False
+            rec["reject_reason"] = "unhealthy"
+            processed.append(rec)
+            continue
+
+        # 2. 高度角筛选（始终执行）
+        elevation = rec.get("elevation_deg", 90.0)
+        if elevation < elevation_mask_deg:
+            rec["is_used"] = False
+            rec["reject_reason"] = "low_elevation"
+            processed.append(rec)
+            continue
+
+        # 3. 伪距范围检查（仅在启用粗差筛选时执行）
+        if enable_outlier_filter:
+            p = rec["pseudorange"]
+            if not (15_000_000.0 <= p <= 50_000_000.0):
+                rec["is_used"] = False
+                rec["reject_reason"] = "range_outlier"
+                processed.append(rec)
+                continue
+
+            # 4. 统计粗差检查（仅在启用粗差筛选且阈值有效时执行）
+            if outlier_threshold_m is not None and outlier_threshold_m > 0:
+                if abs(p - median_p) > outlier_threshold_m:
+                    rec["is_used"] = False
+                    rec["reject_reason"] = "statistical_outlier"
+                    processed.append(rec)
+                    continue
+
+        processed.append(rec)
+
+    return processed
+
+
+# ============================================================================
+# 统一入口函数
+# ============================================================================
+def run_module1(
+    nav_path: str | Path,
+    receiver_approx: Tuple[float, float, float],
+    epochs: List[datetime],
+    seed: int,
+    output_dir: str | Path = "output",
+    elevation_mask_deg: float = 0.0,
+    enable_pseudorange_outlier_filter: bool = False,
+) -> Dict[str, Path]:
+    """模块一统一入口：解析 NAV、计算卫星位置、生成模拟伪距、输出 CSV。
+
+    参数:
+        nav_path: RINEX NAV 文件路径
+        receiver_approx: 接收机概略 ECEF 坐标 (x, y, z)，单位 m
+        epochs: 仿真历元列表
+        seed: 随机数种子，保证可复现
+        output_dir: 输出目录
+        elevation_mask_deg: 高度角截止阈值，默认 0°
+
+    返回:
+        {"nav_debug": path1, "simulated_pseudorange": path2}
+    """
+    nav_path = Path(nav_path)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    summary_path = output_path / "module1_nav_parse_summary.txt"
-    csv_path = output_path / "module1_ephemeris_list.csv"
 
-    info = parse_info or NavParseInfo(nav_file_path=str(nav_file_path or "未知"))
-    total_records = sum(len(items) for items in nav_data.values())
-    unhealthy = [
-        eph for eph_list in nav_data.values() for eph in eph_list if int(round(eph.health)) != 0
+    # 1. 解析 NAV 文件
+    nav_data, parse_info = parse_rinex_nav_with_info(nav_path)
+
+    # 2. 初始化随机数生成器
+    rng = random.Random(seed)
+
+    # 3. 逐历元处理
+    all_records: List[dict] = []
+    for epoch in epochs:
+        # 同一历元共用接收机钟差
+        receiver_clock_error = 60.0 + rng.gauss(0.0, 12.0)
+
+        for sat_id in sorted(nav_data):
+            eph = select_ephemeris(nav_data, sat_id, epoch, healthy_only=False)
+            if eph is None:
+                continue
+
+            try:
+                sat_x, sat_y, sat_z = compute_satellite_position(eph, epoch)
+            except Exception:
+                continue
+
+            rho = compute_geometric_range((sat_x, sat_y, sat_z), receiver_approx)
+            elevation_deg = compute_elevation((sat_x, sat_y, sat_z), receiver_approx)
+
+            # 生成伪距（使用同一历元的接收机钟差）
+            sim = simulate_pseudorange(rho, rng)
+            # 用同一历元的统一接收机钟差覆盖 individual 随机值
+            sim["receiver_clock_error"] = receiver_clock_error
+            sim["pseudorange"] = (
+                rho
+                + sim["sisre_error"]
+                + sim["iono_error"]
+                + sim["tropo_error"]
+                + receiver_clock_error
+                + sim["noise_error"]
+            )
+
+            record = {
+                "epoch": epoch.isoformat(sep=" "),
+                "sat_id": sat_id,
+                "sat_x": sat_x,
+                "sat_y": sat_y,
+                "sat_z": sat_z,
+                "receiver_x": receiver_approx[0],
+                "receiver_y": receiver_approx[1],
+                "receiver_z": receiver_approx[2],
+                "elevation_deg": elevation_deg,
+                "health": eph.health,
+                **sim,
+            }
+            all_records.append(record)
+
+    # 4. 预处理过滤
+    processed_records = preprocess_pseudorange_records(
+        all_records,
+        elevation_mask_deg=elevation_mask_deg,
+        enable_outlier_filter=enable_pseudorange_outlier_filter,
+    )
+
+    # 5. 保存输出
+    nav_debug_path = _save_nav_debug_csv(nav_data, output_path)
+    pseudo_path = _save_simulated_pseudorange_csv(processed_records, output_path)
+    summary_path = _save_nav_summary(nav_data, output_path, parse_info)
+
+    return {
+        "nav_debug": nav_debug_path,
+        "simulated_pseudorange": pseudo_path,
+        "summary": summary_path,
+        "records": processed_records,
+    }
+
+
+# ============================================================================
+# 输出文件保存
+# ============================================================================
+def _save_nav_debug_csv(
+    nav_data: Dict[str, List[BroadcastEphemeris]],
+    output_path: Path,
+) -> Path:
+    """保存 module1_parsed_nav_debug.csv。"""
+    csv_path = output_path / "module1_parsed_nav_debug.csv"
+    fieldnames = [
+        "sat_id", "toc", "toe", "af0", "af1", "af2",
+        "sqrtA", "e", "i0", "Omega0", "omega", "M0",
+        "DeltaN", "IDOT", "Cuc", "Cus", "Crc", "Crs", "Cic", "Cis",
+        "health", "is_healthy", "parse_status",
     ]
 
+    with csv_path.open("w", newline="", encoding="utf-8-sig") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for sat_id in sorted(nav_data):
+            for eph in nav_data[sat_id]:
+                is_healthy = int(round(eph.health)) == 0
+                writer.writerow(
+                    {
+                        "sat_id": eph.sat_id,
+                        "toc": eph.toc.isoformat(sep=" "),
+                        "toe": eph.toe,
+                        "af0": eph.af0,
+                        "af1": eph.af1,
+                        "af2": eph.af2,
+                        "sqrtA": eph.sqrt_a,
+                        "e": eph.eccentricity,
+                        "i0": eph.i0,
+                        "Omega0": eph.omega0,
+                        "omega": eph.omega,
+                        "M0": eph.m0,
+                        "DeltaN": eph.delta_n,
+                        "IDOT": eph.idot,
+                        "Cuc": eph.cuc,
+                        "Cus": eph.cus,
+                        "Crc": eph.crc,
+                        "Crs": eph.crs,
+                        "Cic": eph.cic,
+                        "Cis": eph.cis,
+                        "health": eph.health,
+                        "is_healthy": "yes" if is_healthy else "no",
+                        "parse_status": "ok",
+                    }
+                )
+
+    return csv_path
+
+
+def _save_nav_summary(
+    nav_data: Dict[str, List[BroadcastEphemeris]],
+    output_path: Path,
+    parse_info: NavParseInfo,
+) -> Path:
+    """保存 module1_nav_parse_summary.txt。"""
+    summary_path = output_path / "module1_nav_parse_summary.txt"
+    total_records = sum(len(items) for items in nav_data.values())
     with summary_path.open("w", encoding="utf-8-sig") as file:
         file.write("模块一：RINEX NAV 导航文件解析结果\n")
         file.write("=" * 50 + "\n")
-        file.write(f"NAV 文件路径：{info.nav_file_path or nav_file_path or '未知'}\n")
-        file.write(f"RINEX 文件版本：{info.rinex_version}\n")
+        file.write(f"NAV 文件路径：{parse_info.nav_file_path}\n")
+        file.write(f"RINEX 文件版本：{parse_info.rinex_version}\n")
         file.write(f"成功解析的北斗三号卫星数量：{len(nav_data)}\n")
         file.write(f"成功解析的广播星历记录总数：{total_records}\n")
-        file.write(f"跳过的非北斗记录数：{info.skipped_non_bds_records}\n")
-        file.write(f"跳过的北斗二号记录数：{info.skipped_bds2_records}\n")
-        file.write(f"不完整记录数：{info.incomplete_records}\n")
-        file.write(f"解析失败的北斗记录数：{info.failed_records}\n")
-        file.write("\n每颗北斗卫星对应的星历记录数：\n")
-        for sat_id in sorted(nav_data):
-            file.write(f"  {sat_id}：{len(nav_data[sat_id])}\n")
-        file.write("\n健康状态检查：\n")
-        if unhealthy:
-            unhealthy_ids = sorted({eph.sat_id for eph in unhealthy})
-            file.write("  是否存在健康状态异常的卫星：是\n")
-            file.write(f"  健康状态异常卫星：{', '.join(unhealthy_ids)}\n")
-            file.write(f"  健康状态异常星历记录数：{len(unhealthy)}\n")
-        else:
-            file.write("  是否存在健康状态异常的卫星：否\n")
-        if info.error_messages:
-            file.write("\n解析失败详情：\n")
-            for message in info.error_messages[:20]:
-                file.write(f"  {message}\n")
-            if len(info.error_messages) > 20:
-                file.write(f"  其余 {len(info.error_messages) - 20} 条错误已省略\n")
+        file.write(f"跳过的非北斗记录数：{parse_info.skipped_non_bds_records}\n")
+        file.write(f"跳过的北斗二号记录数：{parse_info.skipped_bds2_records}\n")
+        file.write(f"不完整记录数：{parse_info.incomplete_records}\n")
+        file.write(f"解析失败的北斗记录数：{parse_info.failed_records}\n")
         file.write("\n模块运行状态：导航文件解析完成。\n")
 
+    return summary_path
+
+
+def _save_ephemeris_list_csv(
+    nav_data: Dict[str, List[BroadcastEphemeris]],
+    output_path: Path,
+) -> Path:
+    """保存 module1_ephemeris_list.csv（兼容旧输出格式）。"""
+    csv_path = output_path / "module1_ephemeris_list.csv"
     fieldnames = [
-        "sat_id",
-        "toc_time",
-        "toe",
-        "af0",
-        "af1",
-        "af2",
-        "sqrtA",
-        "e",
-        "i0",
-        "Omega0",
-        "omega",
-        "M0",
-        "delta_n",
-        "health",
+        "sat_id", "toc_time", "toe", "af0", "af1", "af2",
+        "sqrtA", "e", "i0", "Omega0", "omega", "M0", "delta_n", "health",
     ]
+
     with csv_path.open("w", newline="", encoding="utf-8-sig") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
@@ -367,18 +824,93 @@ def save_nav_parse_outputs(
                     }
                 )
 
-    return {"summary": summary_path, "ephemeris_csv": csv_path}
+    return csv_path
+
+
+def _save_simulated_pseudorange_csv(records: List[dict], output_path: Path) -> Path:
+    """保存 module1_simulated_pseudorange.csv。"""
+    csv_path = output_path / "module1_simulated_pseudorange.csv"
+    fieldnames = [
+        "epoch", "sat_id", "sat_x", "sat_y", "sat_z",
+        "receiver_x", "receiver_y", "receiver_z",
+        "elevation_deg", "rho", "sisre_error", "iono_error",
+        "tropo_error", "receiver_clock_error", "noise_error",
+        "pseudorange", "is_used", "reject_reason",
+    ]
+
+    with csv_path.open("w", newline="", encoding="utf-8-sig") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for rec in records:
+            writer.writerow(
+                {
+                    "epoch": rec.get("epoch", ""),
+                    "sat_id": rec.get("sat_id", ""),
+                    "sat_x": rec.get("sat_x", ""),
+                    "sat_y": rec.get("sat_y", ""),
+                    "sat_z": rec.get("sat_z", ""),
+                    "receiver_x": rec.get("receiver_x", ""),
+                    "receiver_y": rec.get("receiver_y", ""),
+                    "receiver_z": rec.get("receiver_z", ""),
+                    "elevation_deg": rec.get("elevation_deg", ""),
+                    "rho": rec.get("rho", ""),
+                    "sisre_error": rec.get("sisre_error", ""),
+                    "iono_error": rec.get("iono_error", ""),
+                    "tropo_error": rec.get("tropo_error", ""),
+                    "receiver_clock_error": rec.get("receiver_clock_error", ""),
+                    "noise_error": rec.get("noise_error", ""),
+                    "pseudorange": rec.get("pseudorange", ""),
+                    "is_used": "yes" if rec.get("is_used", True) else "no",
+                    "reject_reason": rec.get("reject_reason", ""),
+                }
+            )
+
+    return csv_path
+
+
+# ============================================================================
+# 兼容旧接口
+# ============================================================================
+def save_nav_parse_outputs(
+    nav_data: Dict[str, List[BroadcastEphemeris]],
+    output_dir: str | Path,
+    parse_info: Optional[NavParseInfo] = None,
+    nav_file_path: str | Path | None = None,
+) -> Dict[str, Path]:
+    """兼容旧接口：保存解析摘要 TXT 和星历明细 CSV。"""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    info = parse_info or NavParseInfo(nav_file_path=str(nav_file_path or "未知"))
+    summary_path = _save_nav_summary(nav_data, output_path, info)
+    ephemeris_path = _save_ephemeris_list_csv(nav_data, output_path)
+
+    return {"summary": summary_path, "ephemeris_csv": ephemeris_path}
 
 
 def read_rinex_nav(nav_file: str | Path) -> Dict[str, List[BroadcastEphemeris]]:
     """parse_rinex_nav 的别名，便于外部调用。"""
-
     return parse_rinex_nav(nav_file)
 
 
+# ============================================================================
+# 主程序入口
+# ============================================================================
 if __name__ == "__main__":
-    data, parse_info = parse_rinex_nav_with_info("nav/tarc0910.26b_cnav")
-    paths = save_nav_parse_outputs(data, "output", parse_info)
-    print(f"解析到北斗卫星数量：{len(data)}")
-    print(f"解析到星历记录总数：{sum(len(items) for items in data.values())}")
-    print(f"模块一输出文件：{paths['summary']}，{paths['ephemeris_csv']}")
+    RECEIVER_APPROX = (-2267800.0, 5009340.0, 3221000.0)
+    SEED = 2026
+    EPOCHS = [datetime(2026, 4, 1, 0, 0, 0)]
+
+    paths = run_module1(
+        nav_path="nav/tarc0910.26b_cnav",
+        receiver_approx=RECEIVER_APPROX,
+        epochs=EPOCHS,
+        seed=SEED,
+        output_dir="output",
+        elevation_mask_deg=0.0,
+    )
+
+    print(f"模块一输出文件：")
+    print(f"  导航调试：{paths['nav_debug']}")
+    print(f"  模拟伪距：{paths['simulated_pseudorange']}")
+    print(f"  解析摘要：{paths['summary']}")

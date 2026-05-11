@@ -29,8 +29,8 @@ from typing import Any, Dict, List, Optional
 os.environ.setdefault("MPLCONFIGDIR", str(Path("output") / "matplotlib_cache"))
 
 try:
-    from PySide6.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, Signal
-    from PySide6.QtWidgets import (
+    from PyQt5.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, pyqtSignal as Signal
+    from PyQt5.QtWidgets import (
         QApplication,
         QAbstractItemView,
         QDateTimeEdit,
@@ -56,73 +56,11 @@ try:
         QVBoxLayout,
         QWidget,
     )
-    QT_BINDING = "PySide6"
+    QT_BINDING = "PyQt5"
     QT_IMPORT_ERROR: Optional[Exception] = None
-except ModuleNotFoundError as pyside_error:
-    try:
-        from PyQt6.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, pyqtSignal as Signal
-        from PyQt6.QtWidgets import (
-            QApplication,
-            QAbstractItemView,
-            QDateTimeEdit,
-            QDoubleSpinBox,
-            QFileDialog,
-            QFrame,
-            QGridLayout,
-            QGroupBox,
-            QHBoxLayout,
-            QLabel,
-            QLineEdit,
-            QMainWindow,
-            QMessageBox,
-            QPushButton,
-            QProgressBar,
-            QSlider,
-            QSpinBox,
-            QSplitter,
-            QTableWidget,
-            QTableWidgetItem,
-            QTabWidget,
-            QTextEdit,
-            QVBoxLayout,
-            QWidget,
-        )
-        QT_BINDING = "PyQt6"
-        QT_IMPORT_ERROR = None
-    except ModuleNotFoundError as pyqt6_error:
-        try:
-            from PyQt5.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, pyqtSignal as Signal
-            from PyQt5.QtWidgets import (
-                QApplication,
-                QAbstractItemView,
-                QDateTimeEdit,
-                QDoubleSpinBox,
-                QFileDialog,
-                QFrame,
-                QGridLayout,
-                QGroupBox,
-                QHBoxLayout,
-                QLabel,
-                QLineEdit,
-                QMainWindow,
-                QMessageBox,
-                QPushButton,
-                QProgressBar,
-                QSlider,
-                QSpinBox,
-                QSplitter,
-                QTableWidget,
-                QTableWidgetItem,
-                QTabWidget,
-                QTextEdit,
-                QVBoxLayout,
-                QWidget,
-            )
-            QT_BINDING = "PyQt5"
-            QT_IMPORT_ERROR = None
-        except ModuleNotFoundError as pyqt5_error:
-            QT_BINDING = ""
-            QT_IMPORT_ERROR = pyqt5_error or pyqt6_error or pyside_error
+except ModuleNotFoundError as pyqt5_error:
+    QT_BINDING = ""
+    QT_IMPORT_ERROR = pyqt5_error
 
 if QT_IMPORT_ERROR is None:
     QT_HORIZONTAL = getattr(Qt, "Horizontal", getattr(getattr(Qt, "Orientation", Qt), "Horizontal", None))
@@ -132,8 +70,8 @@ if QT_IMPORT_ERROR is None:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.figure import Figure
 
-    from basic.module1 import parse_rinex_nav_with_info
-    from basic.module3 import ECEF, ecef_to_blh
+    from basic.module1 import ecef_to_blh, parse_rinex_nav_with_info
+    from basic.module3 import ECEF
     from basic.module4 import (
         AnalysisSummary,
         calculate_summary,
@@ -904,7 +842,7 @@ if QT_IMPORT_ERROR is None:
 
 def main() -> int:
     if QT_IMPORT_ERROR is not None:
-        print("未检测到 Qt 绑定，请先安装 PyQt5 或 PySide6。")
+        print("未检测到 Qt 绑定，请先安装 PyQt5。")
         print("推荐命令：python -m pip install PyQt5")
         return 1
 

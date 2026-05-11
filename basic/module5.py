@@ -28,12 +28,11 @@ import traceback
 from typing import Dict, List
 
 from basic.module1 import (
+    compute_satellite_clock_bias,
+    compute_satellite_position,
     parse_rinex_nav_with_info,
     save_nav_parse_outputs,
-)
-from basic.module2 import (
-    calculate_all_satellite_positions,
-    save_satellite_position_outputs,
+    select_ephemeris,
 )
 from basic.module3 import (
     ECEF,
@@ -88,48 +87,28 @@ def _format_float(value: float, digits: int = 3) -> str:
     return f"{value:.{digits}f}"
 
 
-def _satellite_positions_from_module2_records(position_records: List[dict]) -> Dict[str, ECEF]:
-    """从模块二结果中提取可用于 SPP 的健康卫星坐标。"""
+def _collect_satellite_data_from_module1(
+    nav_data: dict,
+    epoch_time: datetime,
+) -> tuple[dict[str, ECEF], dict[str, float], dict[str, float]]:
+    """直接调用 module1 计算卫星位置、健康状态和钟差。"""
 
     positions: Dict[str, ECEF] = {}
-    for row in position_records:
-        if row["status"] not in {"计算成功", "卫星坐标数量级异常"}:
+    health: Dict[str, float] = {}
+    clock_biases: Dict[str, float] = {}
+    for sat_id in sorted(nav_data):
+        eph = select_ephemeris(nav_data, sat_id, epoch_time, healthy_only=True)
+        if eph is None:
             continue
         try:
-            if row.get("health") in ("", None) or int(round(float(row["health"]))) != 0:
-                continue
-            positions[row["sat_id"]] = (float(row["X"]), float(row["Y"]), float(row["Z"]))
-        except (TypeError, ValueError):
+            x, y, z = compute_satellite_position(eph, epoch_time)
+            clock_bias, _ = compute_satellite_clock_bias(eph, epoch_time)
+            positions[sat_id] = (x, y, z)
+            health[sat_id] = float(eph.health)
+            clock_biases[sat_id] = clock_bias
+        except Exception:
             continue
-    return positions
-
-
-def _satellite_health_from_module2_records(position_records: List[dict]) -> Dict[str, float]:
-    """从模块二结果中提取健康状态，传递给模块三做二次筛选。"""
-
-    satellite_health: Dict[str, float] = {}
-    for row in position_records:
-        if row["status"] not in {"计算成功", "卫星坐标数量级异常"}:
-            continue
-        try:
-            satellite_health[row["sat_id"]] = float(row["health"])
-        except (KeyError, TypeError, ValueError):
-            continue
-    return satellite_health
-
-
-def _satellite_clock_biases_from_module2_records(position_records: List[dict]) -> Dict[str, float]:
-    """从模块二结果中提取卫星钟差，供模块三伪距改正使用。"""
-
-    satellite_clock_biases: Dict[str, float] = {}
-    for row in position_records:
-        if row["status"] not in {"计算成功", "卫星坐标数量级异常"}:
-            continue
-        try:
-            satellite_clock_biases[row["sat_id"]] = float(row["satellite_clock_bias"])
-        except (KeyError, TypeError, ValueError):
-            continue
-    return satellite_clock_biases
+    return positions, health, clock_biases
 
 
 def write_system_test_report(
@@ -245,19 +224,12 @@ def main() -> int:
         print(f"  解析完成：北斗卫星 {sat_count} 颗，星历记录 {eph_count} 条")
 
         print("模块二：正在计算卫星位置与钟差...")
-        position_records = calculate_all_satellite_positions(nav_data, TEST_EPOCH_TIME)
-        module2_paths = save_satellite_position_outputs(
-            position_records,
-            output_path,
-            TEST_EPOCH_TIME,
+        satellite_positions, satellite_health, satellite_clock_biases = _collect_satellite_data_from_module1(
+            nav_data, TEST_EPOCH_TIME
         )
-        module_outputs["module2"] = list(module2_paths.values())
-        module_status["module2"] = "完成"
+        module_status["module2"] = "完成（由 module1 直接提供）"
 
         print("模块三：正在生成模拟伪距并进行单历元 SPP 解算...")
-        satellite_positions = _satellite_positions_from_module2_records(position_records)
-        satellite_health = _satellite_health_from_module2_records(position_records)
-        satellite_clock_biases = _satellite_clock_biases_from_module2_records(position_records)
         if len(satellite_positions) < 4:
             raise ValueError("模块三无法运行：可用卫星位置少于 4 颗")
         pseudo_records = generate_simulated_pseudorange_records(
