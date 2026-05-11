@@ -30,9 +30,13 @@ from typing import Dict, List
 from basic.module1 import (
     compute_satellite_clock_bias,
     compute_satellite_position,
-    parse_rinex_nav_with_info,
-    save_nav_parse_outputs,
+    parse_nav_file,
+    run_module1,
     select_ephemeris,
+)
+from basic.module2 import (
+    calculate_all_satellite_positions,
+    save_satellite_position_outputs,
 )
 from basic.module3 import (
     ECEF,
@@ -208,10 +212,24 @@ def main() -> int:
                 f"NAV 文件不存在：{nav_path.resolve()}。请在 basic/module5.py 中修改 NAV_FILE_PATH，或确认 nav/ 目录下存在 .26b_cnav 文件。"
             )
 
-        print("模块一：正在解析 RINEX NAV 导航文件...")
-        nav_data, parse_info = parse_rinex_nav_with_info(nav_path)
-        module1_paths = save_nav_parse_outputs(nav_data, output_path, parse_info)
-        module_outputs["module1"] = list(module1_paths.values())
+        print("模块一：正在解析 RINEX NAV 导航文件并生成输出...")
+        nav_data, parse_info = parse_nav_file(nav_path)
+
+        # 显式调用 run_module1() 生成模块一完整输出
+        module1_result = run_module1(
+            nav_path=NAV_FILE_PATH,
+            receiver_approx=RECEIVER_TRUE_POSITION,
+            epochs=[TEST_EPOCH_TIME],
+            seed=RANDOM_SEED,
+            output_dir=OUTPUT_DIR,
+            elevation_mask_deg=ELEVATION_MASK_DEG,
+            enable_pseudorange_outlier_filter=False,
+        )
+        module_outputs["module1"] = [
+            module1_result["nav_debug"],
+            module1_result["simulated_pseudorange"],
+            module1_result["summary"],
+        ]
         module_status["module1"] = "完成"
 
         sat_count = len(nav_data)
@@ -221,10 +239,17 @@ def main() -> int:
         print(f"  解析完成：北斗卫星 {sat_count} 颗，星历记录 {eph_count} 条")
 
         print("模块二：正在计算卫星位置与钟差...")
+        module2_position_records = calculate_all_satellite_positions(nav_data, TEST_EPOCH_TIME)
+        module2_paths = save_satellite_position_outputs(module2_position_records, OUTPUT_DIR, TEST_EPOCH_TIME)
+        module_outputs["module2"] = [
+            module2_paths["csv"],
+            module2_paths["summary"],
+        ]
+        module_status["module2"] = "完成"
+
         satellite_positions, satellite_health = _collect_satellite_data_from_module1(
             nav_data, TEST_EPOCH_TIME
         )
-        module_status["module2"] = "完成（由 module1 直接提供）"
 
         print("模块三：正在生成模拟伪距并进行单历元 SPP 解算...")
         if len(satellite_positions) < 4:
@@ -245,6 +270,7 @@ def main() -> int:
             convergence_threshold=CONVERGENCE_THRESHOLD,
             satellite_health=satellite_health,
             elevation_mask_deg=ELEVATION_MASK_DEG,
+            enable_pseudorange_outlier_filter=False,
         )
         module3_paths = save_single_epoch_spp_outputs(
             pseudo_records,

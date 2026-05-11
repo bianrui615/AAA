@@ -202,6 +202,7 @@ def run_continuous_positioning(
             max_iter=max_iter,
             convergence_threshold=convergence_threshold,
             elevation_mask_deg=elevation_mask_deg,
+            enable_pseudorange_outlier_filter=False,
         )
 
         if solution.converged:

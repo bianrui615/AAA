@@ -70,7 +70,7 @@ if QT_IMPORT_ERROR is None:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.figure import Figure
 
-    from basic.module1 import ecef_to_blh, parse_rinex_nav_with_info
+    from basic.module1 import ecef_to_blh, parse_nav_file
     from basic.module3 import ECEF
     from basic.module4 import (
         AnalysisSummary,
@@ -558,7 +558,7 @@ if QT_IMPORT_ERROR is None:
 
             try:
                 self.log(f"正在解析：{selected_path}")
-                nav_data, parse_info = parse_rinex_nav_with_info(selected_path)
+                nav_data, parse_info = parse_nav_file(selected_path)
                 sat_count = len(nav_data)
                 eph_count = sum(len(records) for records in nav_data.values())
                 if sat_count < 4:

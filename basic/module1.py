@@ -345,68 +345,9 @@ def parse_rinex_nav_with_info(
 ) -> Tuple[Dict[str, List[BroadcastEphemeris]], NavParseInfo]:
     """解析 RINEX NAV 文件，并返回北斗三号星历和解析统计信息。
 
-    保留为普通 RINEX .nav 文件的兼容入口。
+    兼容旧函数名，内部直接调用 BDS-3 CNAV 解析逻辑。
     """
-    path = Path(nav_file)
-    info = NavParseInfo(nav_file_path=str(path))
-    if not path.exists():
-        raise FileNotFoundError(f"NAV 文件不存在: {path}")
-
-    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    if lines:
-        version_text = lines[0][:20].strip()
-        info.rinex_version = version_text or "未知"
-
-    start_index = None
-    for index, line in enumerate(lines):
-        if "END OF HEADER" in line:
-            start_index = index + 1
-            break
-    if start_index is None:
-        raise ValueError("未在 RINEX NAV 文件中找到 END OF HEADER")
-
-    records: List[BroadcastEphemeris] = []
-    i = start_index
-    while i < len(lines):
-        line = lines[i]
-        sat_id = line[:3].strip()
-        if not sat_id:
-            i += 1
-            continue
-        if len(lines[i : i + 8]) < 8:
-            info.incomplete_records += 1
-            break
-        if not sat_id.startswith("C"):
-            info.skipped_non_bds_records += 1
-            i += 8
-            continue
-
-        # 只保留北斗三号（PRN >= 19），跳过北斗二号（C01-C14）
-        try:
-            prn = int(sat_id[1:])
-            if prn < 19:
-                info.skipped_bds2_records += 1
-                i += 8
-                continue
-        except ValueError:
-            info.skipped_non_bds_records += 1
-            i += 8
-            continue
-
-        record = lines[i : i + 8]
-        try:
-            eph = _build_ephemeris(record)
-            if eph is not None:
-                records.append(eph)
-        except Exception as exc:
-            info.failed_records += 1
-            info.error_messages.append(f"{sat_id} 第 {i + 1} 行附近解析失败: {exc}")
-        i += 8
-
-    nav_data = group_ephemeris_by_sat(records)
-    for eph_list in nav_data.values():
-        eph_list.sort(key=lambda item: item.toc)
-    return nav_data, info
+    return parse_bds_cnav_file(nav_file)
 
 
 def parse_rinex_nav(nav_file: str | Path) -> Dict[str, List[BroadcastEphemeris]]:
@@ -498,25 +439,12 @@ def parse_bds_cnav_file(
 def parse_nav_file(
     nav_path: str | Path,
 ) -> Tuple[Dict[str, List[BroadcastEphemeris]], NavParseInfo]:
-    """自动判断文件类型并解析导航文件。
+    """解析导航文件。
 
-    - 如果文件头包含 CNAV / B-CNAV 关键字，调用 parse_bds_cnav_file；
-    - 否则调用 parse_rinex_nav_with_info 走普通 RINEX NAV 解析逻辑。
+    默认所有输入导航文件都按 BDS-3 CNAV 格式解析，直接调用 parse_bds_cnav_file。
+    不再根据文件后缀或文件头判断普通 NAV 与 CNAV。
     """
-    path = Path(nav_path)
-    if not path.exists():
-        raise FileNotFoundError(f"NAV 文件不存在: {path}")
-
-    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    is_cnav = False
-    for line in lines[:120]:
-        if "CNAV" in line or "B-CNAV" in line:
-            is_cnav = True
-            break
-
-    if is_cnav:
-        return parse_bds_cnav_file(path)
-    return parse_rinex_nav_with_info(path)
+    return parse_bds_cnav_file(nav_path)
 
 
 def select_ephemeris_for_epoch(
@@ -1073,8 +1001,8 @@ def run_module1(
             except Exception:
                 continue
 
-            rho = compute_geometric_range((sat_x, sat_y, sat_z), receiver_approx)
-            elevation_deg = compute_elevation((sat_x, sat_y, sat_z), receiver_approx)
+            rho = compute_geometric_range(receiver_approx, (sat_x, sat_y, sat_z))
+            elevation_deg = compute_elevation(receiver_approx, (sat_x, sat_y, sat_z))
 
             # 生成伪距（使用同一历元的接收机钟差）
             sim = simulate_pseudorange(rho, rng)

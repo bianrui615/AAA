@@ -123,7 +123,7 @@ def generate_simulated_pseudorange_record(
         + receiver_clock_error
         + noise_error
     )
-    elevation_deg = satellite_elevation_deg(sat_position, receiver_true_position)
+    elevation_deg = satellite_elevation_deg(receiver_true_position, sat_position)
 
     return {
         "epoch_time": epoch_time.isoformat(sep=" "),
@@ -270,7 +270,7 @@ def _filter_by_elevation(
     for sat_id in satellite_positions:
         if sat_id not in pseudoranges:
             continue
-        elevation = satellite_elevation_deg(satellite_positions[sat_id], receiver_position)
+        elevation = satellite_elevation_deg(receiver_position, satellite_positions[sat_id])
         if elevation >= elevation_mask_deg:
             filtered_positions[sat_id] = satellite_positions[sat_id]
             filtered_pseudoranges[sat_id] = pseudoranges[sat_id]
@@ -345,6 +345,7 @@ def solve_spp(
     convergence_threshold: float = 1e-4,
     satellite_health: Optional[Dict[str, float]] = None,
     elevation_mask_deg: float = 0.0,
+    enable_pseudorange_outlier_filter: bool = False,
 ) -> SppSolution:
     """使用迭代最小二乘求解接收机坐标和接收机钟差。"""
 
@@ -378,8 +379,8 @@ def solve_spp(
             )
 
     for iteration in range(1, max_iter + 1):
-        # 伪距粗差剔除（每次迭代前用当前概略位置）
-        if len(common_sats) >= 5:
+        # 伪距粗差剔除（每次迭代前用当前概略位置，仅在启用时执行）
+        if enable_pseudorange_outlier_filter and len(common_sats) >= 5:
             pseudoranges, rejected = _reject_pseudorange_outliers(
                 healthy_positions,
                 pseudoranges,

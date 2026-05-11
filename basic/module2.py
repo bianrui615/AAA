@@ -335,9 +335,9 @@ def save_corrected_pseudorange_csv(
 
 
 if __name__ == "__main__":
-    from basic.module1 import parse_rinex_nav
+    from basic.module1 import parse_nav_file
 
-    nav = parse_rinex_nav("nav/tarc0910.26b_cnav")
+    nav = parse_nav_file("nav/tarc0910.26b_cnav")[0]
     test_epoch = datetime(2026, 4, 1, 0, 0, 0)
     receiver_approx = (-2267800.0, 5009340.0, 3221000.0)
     rng = random.Random(2026)
