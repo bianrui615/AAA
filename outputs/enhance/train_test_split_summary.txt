@@ -1,0 +1,11 @@
+﻿机器学习数据集划分摘要
+========================================
+数据集文件：outputs\enhance\ml_dataset.csv
+总样本数：26
+训练集样本数：18
+测试集样本数：8
+特征数量：19
+标签数量：3 (error_x, error_y, error_z)
+测试集比例：30%
+划分随机种子：2026
+特征列表：satellite_count, raw_satellite_count, PDOP, GDOP, clock_bias, iteration_count, elevation_mask_deg, mean_pseudorange, std_pseudorange, mean_rho, std_rho, mean_sisre_error, mean_iono_error, mean_tropo_error, mean_receiver_clock_error, mean_noise_error, mean_elevation_deg, min_elevation_deg, max_elevation_deg
