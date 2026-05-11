@@ -12,13 +12,18 @@ rinex_gui.py
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+# 确保项目根目录在 sys.path 中，支持直接运行和作为模块导入
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 import csv
 import math
 import os
 import shutil
-import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path("output") / "matplotlib_cache"))
@@ -127,15 +132,15 @@ if QT_IMPORT_ERROR is None:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.figure import Figure
 
-    from module1_nav_parser import parse_rinex_nav_with_info
-    from module3_spp_solver import ECEF, ecef_to_blh
-    from module4_continuous_analysis import (
+    from basic.module1 import parse_rinex_nav_with_info
+    from basic.module3 import ECEF, ecef_to_blh
+    from basic.module4 import (
         AnalysisSummary,
         calculate_summary,
         plot_results,
         run_continuous_positioning,
     )
-    from module5_main_system_test import (
+    from basic.module5 import (
         CONVERGENCE_THRESHOLD,
         ELEVATION_MASK_DEG,
         MAX_ITERATIONS,
@@ -601,11 +606,13 @@ if QT_IMPORT_ERROR is None:
 
         def import_nav_file(self, selected_path: Optional[Path] = None) -> None:
             if selected_path is None or isinstance(selected_path, bool):
+                nav_dir = Path("nav")
+                default_dir = str(nav_dir) if nav_dir.exists() else str(Path.cwd())
                 file_name, _ = QFileDialog.getOpenFileName(
                     self,
                     "选择 RINEX NAV 文件",
-                    str(Path.cwd()),
-                    "RINEX NAV (*.rnx *.nav *.26b *.??n *.*)",
+                    default_dir,
+                    "RINEX NAV (*.26b_cnav *.cnav *.rnx *.nav *.26b *.??n *.*)",
                 )
                 if not file_name:
                     return

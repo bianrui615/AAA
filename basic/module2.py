@@ -10,6 +10,13 @@ module2_satellite_position_clock.py
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+# 确保项目根目录在 sys.path 中，支持直接运行和作为模块导入
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from dataclasses import dataclass
 from datetime import datetime
 import csv
@@ -17,7 +24,7 @@ import math
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from module1_nav_parser import BroadcastEphemeris, select_ephemeris
+from basic.module1 import BroadcastEphemeris, select_ephemeris
 
 
 # 常量定义，所有公式均使用 SI 单位。
@@ -362,7 +369,7 @@ def save_satellite_position_outputs(
 if __name__ == "__main__":
     from module1_nav_parser import parse_rinex_nav
 
-    nav = parse_rinex_nav("tarc0910.26b")
+    nav = parse_rinex_nav("nav/tarc0910.26b_cnav")
     test_epoch = datetime(2026, 4, 1, 0, 0, 0)
     rows = calculate_all_satellite_positions(nav, test_epoch)
     paths = save_satellite_position_outputs(rows, "output", test_epoch)

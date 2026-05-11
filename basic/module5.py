@@ -1,5 +1,5 @@
 """
-module5_main_system_test.py
+module5.py
 
 模块五：软件系统整合与测试模块。
 
@@ -15,29 +15,34 @@ module5_main_system_test.py
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+# 确保项目根目录在 sys.path 中，支持直接运行和作为模块导入
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from datetime import datetime
 import math
-from pathlib import Path
-import sys
 import traceback
 from typing import Dict, List
 
-from module1_nav_parser import (
+from basic.module1 import (
     parse_rinex_nav_with_info,
     save_nav_parse_outputs,
 )
-from module2_satellite_position_clock import (
+from basic.module2 import (
     calculate_all_satellite_positions,
     save_satellite_position_outputs,
 )
-from module3_spp_solver import (
+from basic.module3 import (
     ECEF,
     generate_simulated_pseudorange_records,
     pseudorange_records_to_dict,
     save_single_epoch_spp_outputs,
     solve_spp,
 )
-from module4_continuous_analysis import AnalysisSummary, run_continuous_positioning
+from basic.module4 import AnalysisSummary, run_continuous_positioning
 
 
 PROJECT_NAME = "北斗定位解算全流程软件系统"
@@ -47,7 +52,7 @@ PROJECT_NAME = "北斗定位解算全流程软件系统"
 # =========================
 
 # NAV 文件路径。若 NAV 文件不在当前目录，可填写绝对路径或相对路径。
-NAV_FILE_PATH = "tarc0910.26b"
+NAV_FILE_PATH = "nav/tarc0910.26b_cnav"
 
 # 接收机真实 ECEF 坐标，单位 m。
 RECEIVER_TRUE_POSITION: ECEF = (-2267800.0, 5009340.0, 3221000.0)
@@ -224,7 +229,7 @@ def main() -> int:
         nav_path = Path(NAV_FILE_PATH)
         if not nav_path.exists():
             raise FileNotFoundError(
-                f"NAV 文件不存在：{nav_path.resolve()}。请在 module5_main_system_test.py 中修改 NAV_FILE_PATH。"
+                f"NAV 文件不存在：{nav_path.resolve()}。请在 basic/module5.py 中修改 NAV_FILE_PATH，或确认 nav/ 目录下存在 .26b_cnav 文件。"
             )
 
         print("模块一：正在解析 RINEX NAV 导航文件...")

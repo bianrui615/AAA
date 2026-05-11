@@ -9,6 +9,13 @@ module4_continuous_analysis.py
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+# 确保项目根目录在 sys.path 中，支持直接运行和作为模块导入
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import csv
@@ -39,9 +46,9 @@ if plt is not None:
     ]
     plt.rcParams["axes.unicode_minus"] = False
 
-from module1_nav_parser import BroadcastEphemeris, select_ephemeris
-from module2_satellite_position_clock import calculate_satellite_position_clock
-from module3_spp_solver import (
+from basic.module1 import BroadcastEphemeris, select_ephemeris
+from basic.module2 import calculate_satellite_position_clock
+from basic.module3 import (
     ECEF,
     ecef_to_blh,
     generate_simulated_pseudorange_records,

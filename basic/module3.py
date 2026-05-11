@@ -681,4 +681,4 @@ def save_single_epoch_spp_outputs(
 
 
 if __name__ == "__main__":
-    print("请运行 module5_main_system_test.py，以使用 NAV 星历执行模块三测试。")
+    print("请运行 basic/module5.py，以使用 NAV 星历执行模块三测试。")

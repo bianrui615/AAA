@@ -355,7 +355,7 @@ def read_rinex_nav(nav_file: str | Path) -> Dict[str, List[BroadcastEphemeris]]:
 
 
 if __name__ == "__main__":
-    data, parse_info = parse_rinex_nav_with_info("tarc0910.26b")
+    data, parse_info = parse_rinex_nav_with_info("nav/tarc0910.26b_cnav")
     paths = save_nav_parse_outputs(data, "output", parse_info)
     print(f"解析到北斗卫星数量：{len(data)}")
     print(f"解析到星历记录总数：{sum(len(items) for items in data.values())}")
