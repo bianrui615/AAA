@@ -1,0 +1,50 @@
+﻿模块五：系统整合与测试报告
+============================================
+项目名称：北斗定位解算全流程软件系统
+测试时间：2026-05-11 17:14:21
+NAV 文件路径：nav\tarc0910.26b_cnav
+接收机真实 ECEF 坐标：X=-2267800.0000 m，Y=5009340.0000 m，Z=3221000.0000 m
+仿真起始时间：2026-04-01 00:00:00
+仿真结束时间：2026-04-01 01:00:00
+采样间隔：300 s
+最大迭代次数：12
+收敛阈值：0.0001 m
+高度角截止阈值：0.0°
+随机数种子：2026
+
+模块一：RINEX NAV 导航文件解析运行状态：完成
+输出文件列表：
+  - output\module1_nav_parse_summary.txt
+  - output\module1_ephemeris_list.csv
+
+模块二：卫星位置与钟差计算运行状态：完成
+输出文件列表：
+  - output\module2_satellite_position_clock.csv
+  - output\module2_satellite_position_summary.txt
+
+模块三：模拟伪距与单历元 SPP 解算运行状态：完成
+输出文件列表：
+  - output\module3_pseudorange_single_epoch.csv
+  - output\module3_spp_result_single_epoch.txt
+
+模块四：连续定位与结果分析运行状态：完成
+输出文件列表：
+  - output\module4_continuous_position_results.csv
+  - output\module4_error_statistics.txt
+  - output\module4_error_curve.png
+  - output\module4_trajectory.png
+  - output\module4_satellite_dop_curve.png
+
+连续定位总体统计结果：
+  总历元数：13
+  成功解算历元数：13
+  失败历元数：0
+  平均可用卫星数量：24.38
+  平均 PDOP：414.742
+  平均 GDOP：582.253
+  平均误差：121.050 m
+  RMS 误差：182.792 m
+  最大误差：423.646 m
+
+系统测试结论：
+本次测试中，系统成功完成 NAV 文件解析、卫星位置计算、模拟伪距生成、单点定位解算和连续定位分析。定位结果能够正常输出，误差统计和可视化图表生成成功，说明系统基本满足设计要求。

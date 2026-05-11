@@ -1,5 +1,5 @@
 """
-module2_satellite_position_clock.py
+module2.py
 
 模块二：卫星位置与钟差计算模块。
 
@@ -367,7 +367,7 @@ def save_satellite_position_outputs(
 
 
 if __name__ == "__main__":
-    from module1_nav_parser import parse_rinex_nav
+    from basic.module1 import parse_rinex_nav
 
     nav = parse_rinex_nav("nav/tarc0910.26b_cnav")
     test_epoch = datetime(2026, 4, 1, 0, 0, 0)

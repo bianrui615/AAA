@@ -1,11 +1,12 @@
 """
-module1_nav_parser.py
+module1.py
 
 模块一：RINEX NAV 导航文件解析模块。
 
 本模块只读取 RINEX NAV 导航文件，不读取 OBS 观测文件。解析时只保留
-北斗卫星，卫星编号以 C 开头，例如 C01、C02。模块支持 RINEX 3.x 常见
-导航文件格式，并兼容科学计数法中的 D/E 指数写法，例如 1.23D-04。
+北斗三号卫星（卫星编号以 C 开头且 PRN >= 19，例如 C19、C20、C21）。
+模块支持 RINEX 3.x 常见导航文件格式，并兼容科学计数法中的 D/E 指数
+写法，例如 1.23D-04。
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ class NavParseInfo:
     nav_file_path: str = ""
     rinex_version: str = "未知"
     skipped_non_bds_records: int = 0
+    skipped_bds2_records: int = 0
     failed_records: int = 0
     incomplete_records: int = 0
     error_messages: List[str] = field(default_factory=list)
@@ -127,6 +129,13 @@ def _build_ephemeris(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
     first_line = record_lines[0]
     sat_id = first_line[:3].strip()
     if not sat_id.startswith("C"):
+        return None
+    # 只保留北斗三号（PRN >= 19）
+    try:
+        prn = int(sat_id[1:])
+        if prn < 19:
+            return None
+    except ValueError:
         return None
 
     toc = _parse_epoch_from_first_line(first_line)
@@ -217,6 +226,18 @@ def parse_rinex_nav_with_info(
             i += 8
             continue
 
+        # 只保留北斗三号（PRN >= 19），跳过北斗二号（C01-C14）
+        try:
+            prn = int(sat_id[1:])
+            if prn < 19:
+                info.skipped_bds2_records += 1
+                i += 8
+                continue
+        except ValueError:
+            info.skipped_non_bds_records += 1
+            i += 8
+            continue
+
         record = lines[i : i + 8]
         try:
             eph = _build_ephemeris(record)
@@ -281,9 +302,10 @@ def save_nav_parse_outputs(
         file.write("=" * 50 + "\n")
         file.write(f"NAV 文件路径：{info.nav_file_path or nav_file_path or '未知'}\n")
         file.write(f"RINEX 文件版本：{info.rinex_version}\n")
-        file.write(f"成功解析的北斗卫星数量：{len(nav_data)}\n")
+        file.write(f"成功解析的北斗三号卫星数量：{len(nav_data)}\n")
         file.write(f"成功解析的广播星历记录总数：{total_records}\n")
         file.write(f"跳过的非北斗记录数：{info.skipped_non_bds_records}\n")
+        file.write(f"跳过的北斗二号记录数：{info.skipped_bds2_records}\n")
         file.write(f"不完整记录数：{info.incomplete_records}\n")
         file.write(f"解析失败的北斗记录数：{info.failed_records}\n")
         file.write("\n每颗北斗卫星对应的星历记录数：\n")
