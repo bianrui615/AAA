@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beidou-spp"
+version = "0.1.0"
+description = "Pure Python Beidou RINEX NAV SPP full-flow system"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "PySide6",
+  "PyQt6",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["beidou_spp*"]
+

@@ -15,6 +15,7 @@ from __future__ import annotations
 import csv
 import math
 import os
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -23,8 +24,8 @@ from typing import Any, Dict, List, Optional
 os.environ.setdefault("MPLCONFIGDIR", str(Path("output") / "matplotlib_cache"))
 
 try:
-    from PyQt5.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, pyqtSignal as Signal
-    from PyQt5.QtWidgets import (
+    from PySide6.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, Signal
+    from PySide6.QtWidgets import (
         QApplication,
         QAbstractItemView,
         QDateTimeEdit,
@@ -50,12 +51,12 @@ try:
         QVBoxLayout,
         QWidget,
     )
-    QT_BINDING = "PyQt5"
+    QT_BINDING = "PySide6"
     QT_IMPORT_ERROR: Optional[Exception] = None
-except ModuleNotFoundError as pyqt_error:
+except ModuleNotFoundError as pyside_error:
     try:
-        from PySide6.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, Signal
-        from PySide6.QtWidgets import (
+        from PyQt6.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, pyqtSignal as Signal
+        from PyQt6.QtWidgets import (
             QApplication,
             QAbstractItemView,
             QDateTimeEdit,
@@ -81,13 +82,48 @@ except ModuleNotFoundError as pyqt_error:
             QVBoxLayout,
             QWidget,
         )
-        QT_BINDING = "PySide6"
+        QT_BINDING = "PyQt6"
         QT_IMPORT_ERROR = None
-    except ModuleNotFoundError as pyside_error:
-        QT_BINDING = ""
-        QT_IMPORT_ERROR = pyside_error or pyqt_error
+    except ModuleNotFoundError as pyqt6_error:
+        try:
+            from PyQt5.QtCore import QDate, QDateTime, QThread, QTime, QTimer, Qt, pyqtSignal as Signal
+            from PyQt5.QtWidgets import (
+                QApplication,
+                QAbstractItemView,
+                QDateTimeEdit,
+                QDoubleSpinBox,
+                QFileDialog,
+                QFrame,
+                QGridLayout,
+                QGroupBox,
+                QHBoxLayout,
+                QLabel,
+                QLineEdit,
+                QMainWindow,
+                QMessageBox,
+                QPushButton,
+                QProgressBar,
+                QSlider,
+                QSpinBox,
+                QSplitter,
+                QTableWidget,
+                QTableWidgetItem,
+                QTabWidget,
+                QTextEdit,
+                QVBoxLayout,
+                QWidget,
+            )
+            QT_BINDING = "PyQt5"
+            QT_IMPORT_ERROR = None
+        except ModuleNotFoundError as pyqt5_error:
+            QT_BINDING = ""
+            QT_IMPORT_ERROR = pyqt5_error or pyqt6_error or pyside_error
 
 if QT_IMPORT_ERROR is None:
+    QT_HORIZONTAL = getattr(Qt, "Horizontal", getattr(getattr(Qt, "Orientation", Qt), "Horizontal", None))
+    QT_ALIGN_RIGHT = getattr(Qt, "AlignRight", getattr(getattr(Qt, "AlignmentFlag", Qt), "AlignRight", None))
+    QT_ALIGN_VCENTER = getattr(Qt, "AlignVCenter", getattr(getattr(Qt, "AlignmentFlag", Qt), "AlignVCenter", None))
+
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.figure import Figure
 
@@ -262,7 +298,7 @@ if QT_IMPORT_ERROR is None:
             root_layout = QHBoxLayout(root)
             root_layout.setContentsMargins(10, 10, 10, 10)
 
-            splitter = QSplitter(Qt.Horizontal)
+            splitter = QSplitter(QT_HORIZONTAL)
             splitter.addWidget(self._build_control_panel())
             splitter.addWidget(self._build_workspace())
             splitter.setStretchFactor(0, 0)
@@ -376,8 +412,11 @@ if QT_IMPORT_ERROR is None:
             self.run_button.clicked.connect(self.start_positioning)
             self.load_csv_button = QPushButton("载入结果")
             self.load_csv_button.clicked.connect(self.load_existing_csv)
+            self.export_button = QPushButton("导出结果")
+            self.export_button.clicked.connect(self.export_outputs)
             action_layout.addWidget(self.run_button)
             action_layout.addWidget(self.load_csv_button)
+            action_layout.addWidget(self.export_button)
             layout.addLayout(action_layout)
 
             self.progress_bar = QProgressBar()
@@ -446,7 +485,7 @@ if QT_IMPORT_ERROR is None:
             controls = QHBoxLayout()
             self.play_button = QPushButton("播放")
             self.play_button.clicked.connect(self.toggle_playback)
-            self.play_slider = QSlider(Qt.Horizontal)
+            self.play_slider = QSlider(QT_HORIZONTAL)
             self.play_slider.setRange(0, 0)
             self.play_slider.valueChanged.connect(self.update_playback_plot)
             self.play_speed_spin = QSpinBox()
@@ -649,7 +688,7 @@ if QT_IMPORT_ERROR is None:
             for col, text in enumerate(values):
                 item = QTableWidgetItem(text)
                 if col in {2, 3, 4, 5, 6, 7, 8, 9}:
-                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    item.setTextAlignment(QT_ALIGN_RIGHT | QT_ALIGN_VCENTER)
                 self.result_table.setItem(table_row, col, item)
             self.result_table.scrollToBottom()
 
@@ -697,6 +736,42 @@ if QT_IMPORT_ERROR is None:
             except Exception as exc:
                 QMessageBox.critical(self, "载入失败", str(exc))
                 self.log(f"载入失败：{exc}")
+
+        def export_outputs(self) -> None:
+            source_dir = Path(OUTPUT_DIR)
+            if not source_dir.exists():
+                QMessageBox.warning(self, "缺少输出", "当前还没有可导出的 output 目录。")
+                return
+            target_name = QFileDialog.getExistingDirectory(
+                self,
+                "选择导出目录",
+                str(Path.cwd()),
+            )
+            if not target_name:
+                return
+            target_dir = Path(target_name)
+            exported = 0
+            wanted = [
+                "positioning_results.csv",
+                "module4_continuous_position_results.csv",
+                "accuracy_report.md",
+                "module4_error_statistics.txt",
+                "trajectory.png",
+                "position_error.png",
+                "dop_and_sat_count.png",
+                "module4_trajectory.png",
+                "module4_error_curve.png",
+                "module4_satellite_dop_curve.png",
+                "test_report.md",
+                "module5_system_test_report.txt",
+            ]
+            for name in wanted:
+                src = source_dir / name
+                if src.exists():
+                    shutil.copy2(src, target_dir / name)
+                    exported += 1
+            self.log(f"已导出 {exported} 个结果/报告文件到：{target_dir}")
+            QMessageBox.information(self, "导出完成", f"已导出 {exported} 个文件。")
 
         def toggle_playback(self) -> None:
             if not self.results:
