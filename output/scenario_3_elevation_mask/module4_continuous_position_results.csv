@@ -1,0 +1,14 @@
+﻿epoch_time,status,satellite_count,raw_satellite_count,X,Y,Z,lat,lon,height,clock_bias,PDOP,GDOP,error_3d,iteration_count,rejected_outliers,failure_reason,elevation_mask_deg
+2026-04-01 00:00:00,失败,1,27,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:05:00,失败,1,27,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:10:00,失败,1,27,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:15:00,失败,1,27,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:20:00,失败,1,27,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:25:00,失败,1,27,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:30:00,失败,1,27,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:35:00,失败,1,26,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:40:00,失败,1,26,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:45:00,失败,1,26,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:50:00,失败,1,26,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 00:55:00,失败,1,26,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0
+2026-04-01 01:00:00,失败,1,26,nan,nan,nan,nan,nan,nan,nan,nan,nan,nan,0,0,高度角截止 10.0° 后可用卫星不足 4 颗,10.0

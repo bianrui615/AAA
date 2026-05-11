@@ -1,7 +1,7 @@
 ﻿模块五：系统整合与测试报告
 ============================================
 项目名称：北斗定位解算全流程软件系统
-测试时间：2026-05-11 23:43:04
+测试时间：2026-05-11 23:56:50
 NAV 文件路径：nav\tarc0910.26b_cnav
 接收机真实 ECEF 坐标：X=-2267800.0000 m，Y=5009340.0000 m，Z=3221000.0000 m
 仿真起始时间：2026-04-01 00:00:00
@@ -22,6 +22,7 @@ NAV 文件路径：nav\tarc0910.26b_cnav
 输出文件列表：
   - output\module2_satellite_position_clock.csv
   - output\module2_satellite_position_summary.txt
+  - output\module2_pseudorange_correction_debug.csv
 
 模块三：模拟伪距与单历元 SPP 解算运行状态：完成
 输出文件列表：
@@ -35,6 +36,26 @@ NAV 文件路径：nav\tarc0910.26b_cnav
   - output\module4_error_curve.png
   - output\module4_trajectory.png
   - output\module4_satellite_dop_curve.png
+
+多场景定位测试运行状态：完成
+输出文件列表：
+  - output\module5_multi_scenario_summary.csv
+  - output\module5_multi_scenario_test_report.txt
+  - output\scenario_1_default\module4_continuous_position_results.csv
+  - output\scenario_1_default\module4_error_statistics.txt
+  - output\scenario_1_default\module4_error_curve.png
+  - output\scenario_1_default\module4_trajectory.png
+  - output\scenario_1_default\module4_satellite_dop_curve.png
+  - output\scenario_2_different_seed\module4_continuous_position_results.csv
+  - output\scenario_2_different_seed\module4_error_statistics.txt
+  - output\scenario_2_different_seed\module4_error_curve.png
+  - output\scenario_2_different_seed\module4_trajectory.png
+  - output\scenario_2_different_seed\module4_satellite_dop_curve.png
+  - output\scenario_3_elevation_mask\module4_continuous_position_results.csv
+  - output\scenario_3_elevation_mask\module4_error_statistics.txt
+  - output\scenario_3_elevation_mask\module4_error_curve.png
+  - output\scenario_3_elevation_mask\module4_trajectory.png
+  - output\scenario_3_elevation_mask\module4_satellite_dop_curve.png
 
 连续定位总体统计结果：
   总历元数：13

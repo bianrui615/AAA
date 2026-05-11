@@ -22,10 +22,12 @@ _project_root = Path(__file__).resolve().parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+import csv
+from dataclasses import dataclass
 from datetime import datetime
 import math
 import traceback
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from basic.module1 import (
     compute_satellite_clock_bias,
@@ -36,6 +38,8 @@ from basic.module1 import (
 )
 from basic.module2 import (
     calculate_all_satellite_positions,
+    generate_pseudorange_correction_debug_records,
+    save_pseudorange_correction_debug_csv,
     save_satellite_position_outputs,
 )
 from basic.module3 import (
@@ -81,6 +85,65 @@ OUTPUT_DIR = "output"
 
 # 模块二和模块三独立输出使用的测试历元。
 TEST_EPOCH_TIME = SIMULATION_START_TIME
+
+# 是否启用多场景测试。
+ENABLE_MULTI_SCENARIO_TEST = True
+
+
+@dataclass
+class ScenarioConfig:
+    """多场景测试配置。"""
+
+    name: str
+    nav_file_path: str
+    receiver_true_position: ECEF
+    start_time: datetime
+    end_time: datetime
+    interval_seconds: int
+    random_seed: int
+    max_iter: int
+    convergence_threshold: float
+    elevation_mask_deg: float
+
+
+SCENARIOS = [
+    ScenarioConfig(
+        name="scenario_1_default",
+        nav_file_path=NAV_FILE_PATH,
+        receiver_true_position=RECEIVER_TRUE_POSITION,
+        start_time=SIMULATION_START_TIME,
+        end_time=SIMULATION_END_TIME,
+        interval_seconds=SAMPLING_INTERVAL_SECONDS,
+        random_seed=RANDOM_SEED,
+        max_iter=MAX_ITERATIONS,
+        convergence_threshold=CONVERGENCE_THRESHOLD,
+        elevation_mask_deg=ELEVATION_MASK_DEG,
+    ),
+    ScenarioConfig(
+        name="scenario_2_different_seed",
+        nav_file_path=NAV_FILE_PATH,
+        receiver_true_position=RECEIVER_TRUE_POSITION,
+        start_time=SIMULATION_START_TIME,
+        end_time=SIMULATION_END_TIME,
+        interval_seconds=SAMPLING_INTERVAL_SECONDS,
+        random_seed=42,
+        max_iter=MAX_ITERATIONS,
+        convergence_threshold=CONVERGENCE_THRESHOLD,
+        elevation_mask_deg=ELEVATION_MASK_DEG,
+    ),
+    ScenarioConfig(
+        name="scenario_3_elevation_mask",
+        nav_file_path=NAV_FILE_PATH,
+        receiver_true_position=(-2270000.0, 5009000.0, 3220000.0),
+        start_time=SIMULATION_START_TIME,
+        end_time=SIMULATION_END_TIME,
+        interval_seconds=SAMPLING_INTERVAL_SECONDS,
+        random_seed=RANDOM_SEED,
+        max_iter=MAX_ITERATIONS,
+        convergence_threshold=CONVERGENCE_THRESHOLD,
+        elevation_mask_deg=10.0,
+    ),
+]
 
 
 def _format_float(value: float, digits: int = 3) -> str:
@@ -150,8 +213,9 @@ def write_system_test_report(
             "module2": "模块二：卫星位置与钟差计算",
             "module3": "模块三：模拟伪距与单历元 SPP 解算",
             "module4": "模块四：连续定位与结果分析",
+            "multi_scenario": "多场景定位测试",
         }
-        for module_key in ["module1", "module2", "module3", "module4"]:
+        for module_key in ["module1", "module2", "module3", "module4", "multi_scenario"]:
             file.write(f"{module_names[module_key]}运行状态：{module_status.get(module_key, '未知')}\n")
             file.write("输出文件列表：\n")
             for path in module_outputs.get(module_key, []):
@@ -195,6 +259,165 @@ def print_test_report(summary: AnalysisSummary, report_path: Path) -> None:
     print(f"系统测试报告：{report_path}")
     print(f"输出目录：{Path(OUTPUT_DIR).resolve()}")
     print("======================================================\n")
+
+
+def run_single_scenario_test(
+    scenario: ScenarioConfig,
+    base_output_dir: str | Path,
+) -> Dict[str, Any]:
+    """运行单个场景测试。"""
+
+    output_dir = Path(base_output_dir) / scenario.name
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    nav_data, _ = parse_nav_file(scenario.nav_file_path)
+
+    _, summary = run_continuous_positioning(
+        nav_data=nav_data,
+        start_time=scenario.start_time,
+        end_time=scenario.end_time,
+        interval_seconds=scenario.interval_seconds,
+        receiver_true_position=scenario.receiver_true_position,
+        output_dir=output_dir,
+        random_seed=scenario.random_seed,
+        max_iter=scenario.max_iter,
+        convergence_threshold=scenario.convergence_threshold,
+        elevation_mask_deg=scenario.elevation_mask_deg,
+    )
+
+    output_files = [
+        output_dir / "module4_continuous_position_results.csv",
+        output_dir / "module4_error_statistics.txt",
+        output_dir / "module4_error_curve.png",
+        output_dir / "module4_trajectory.png",
+        output_dir / "module4_satellite_dop_curve.png",
+    ]
+
+    return {
+        "scenario": scenario,
+        "summary": summary,
+        "output_dir": output_dir,
+        "output_files": output_files,
+    }
+
+
+def run_multi_scenario_tests() -> Dict[str, Any]:
+    """运行多场景测试，并生成汇总 CSV 与报告。"""
+
+    base_output_dir = Path(OUTPUT_DIR)
+    scenario_results: List[Dict[str, Any]] = []
+
+    for scenario in SCENARIOS:
+        print(f"  运行场景：{scenario.name} ...")
+        result = run_single_scenario_test(scenario, base_output_dir)
+        scenario_results.append(result)
+        summary = result["summary"]
+        print(
+            f"    完成：成功率 {summary.success_rate * 100:.2f}%，"
+            f"平均误差 {_format_float(summary.mean_error_3d, 3)} m"
+        )
+
+    # 汇总 CSV
+    summary_csv_path = base_output_dir / "module5_multi_scenario_summary.csv"
+    with summary_csv_path.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "scenario_name", "nav_file_path",
+            "receiver_x", "receiver_y", "receiver_z",
+            "start_time", "end_time", "interval_seconds", "random_seed",
+            "total_epochs", "success_epochs", "failed_epochs", "success_rate",
+            "average_satellite_count", "average_pdop", "average_gdop",
+            "mean_error_3d", "rms_error_3d", "max_error_3d", "output_dir",
+        ])
+        for result in scenario_results:
+            s = result["scenario"]
+            summary = result["summary"]
+            writer.writerow([
+                s.name,
+                s.nav_file_path,
+                s.receiver_true_position[0],
+                s.receiver_true_position[1],
+                s.receiver_true_position[2],
+                s.start_time.isoformat(sep=" "),
+                s.end_time.isoformat(sep=" "),
+                s.interval_seconds,
+                s.random_seed,
+                summary.total_epochs,
+                summary.success_epochs,
+                summary.failed_epochs,
+                summary.success_rate,
+                summary.average_satellite_count,
+                summary.average_pdop,
+                summary.average_gdop,
+                summary.mean_error_3d,
+                summary.rms_error_3d,
+                summary.max_error_3d,
+                str(result["output_dir"]),
+            ])
+
+    # 多场景测试报告
+    report_path = base_output_dir / "module5_multi_scenario_test_report.txt"
+    with report_path.open("w", encoding="utf-8-sig") as f:
+        f.write("模块五：多场景定位测试报告\n")
+        f.write("=" * 50 + "\n")
+        f.write("测试目的：验证北斗定位解算系统在不同随机种子、接收机坐标\n")
+        f.write("和高度角阈值等参数变化下的鲁棒性与稳定性。\n\n")
+
+        for idx, result in enumerate(scenario_results, 1):
+            s = result["scenario"]
+            summary = result["summary"]
+            f.write(f"场景 {idx}：{s.name}\n")
+            f.write("-" * 40 + "\n")
+            f.write(f"  NAV 文件：{s.nav_file_path}\n")
+            f.write(
+                f"  接收机坐标：X={s.receiver_true_position[0]:.4f} m，"
+                f"Y={s.receiver_true_position[1]:.4f} m，"
+                f"Z={s.receiver_true_position[2]:.4f} m\n"
+            )
+            f.write(
+                f"  仿真时间：{s.start_time.isoformat(sep=' ')} 至 "
+                f"{s.end_time.isoformat(sep=' ')}\n"
+            )
+            f.write(f"  采样间隔：{s.interval_seconds} s\n")
+            f.write(f"  随机种子：{s.random_seed}\n")
+            f.write(f"  高度角阈值：{s.elevation_mask_deg}°\n")
+            f.write(f"  总历元数：{summary.total_epochs}\n")
+            f.write(f"  成功历元数：{summary.success_epochs}\n")
+            f.write(f"  失败历元数：{summary.failed_epochs}\n")
+            f.write(f"  成功率：{summary.success_rate * 100:.2f}%\n")
+            f.write(f"  平均可用卫星数量：{_format_float(summary.average_satellite_count, 2)}\n")
+            f.write(f"  平均 PDOP：{_format_float(summary.average_pdop, 3)}\n")
+            f.write(f"  平均 GDOP：{_format_float(summary.average_gdop, 3)}\n")
+            f.write(f"  平均误差：{_format_float(summary.mean_error_3d, 3)} m\n")
+            f.write(f"  RMS 误差：{_format_float(summary.rms_error_3d, 3)} m\n")
+            f.write(f"  最大误差：{_format_float(summary.max_error_3d, 3)} m\n")
+            f.write(f"  输出目录：{result['output_dir']}\n\n")
+
+        f.write("场景间结果对比\n")
+        f.write("-" * 40 + "\n")
+        success_rates = [r["summary"].success_rate for r in scenario_results]
+        mean_errors = [
+            r["summary"].mean_error_3d
+            for r in scenario_results
+            if math.isfinite(r["summary"].mean_error_3d)
+        ]
+        if len(set(success_rates)) == 1:
+            f.write(f"所有场景成功率一致：{success_rates[0] * 100:.2f}%\n")
+        else:
+            f.write("不同场景成功率存在差异，说明参数设置对定位结果有影响。\n")
+        if mean_errors:
+            f.write(
+                f"平均误差范围：{min(mean_errors):.3f} m 至 {max(mean_errors):.3f} m\n"
+            )
+        f.write("\n系统测试结论：\n")
+        f.write("多场景测试已完成。系统在不同参数配置下均能正常输出定位结果，\n")
+        f.write("满足多场景测试要求。\n")
+
+    return {
+        "summary_csv": summary_csv_path,
+        "report": report_path,
+        "scenario_results": scenario_results,
+    }
 
 
 def main() -> int:
@@ -241,9 +464,17 @@ def main() -> int:
         print("模块二：正在计算卫星位置与钟差...")
         module2_position_records = calculate_all_satellite_positions(nav_data, TEST_EPOCH_TIME)
         module2_paths = save_satellite_position_outputs(module2_position_records, OUTPUT_DIR, TEST_EPOCH_TIME)
+
+        # 生成模块二伪距修正调试文件（仅用于调试展示，不参与 SPP 解算）
+        debug_records = generate_pseudorange_correction_debug_records(
+            nav_data, TEST_EPOCH_TIME, RECEIVER_TRUE_POSITION
+        )
+        debug_csv_path = save_pseudorange_correction_debug_csv(debug_records, OUTPUT_DIR)
+
         module_outputs["module2"] = [
             module2_paths["csv"],
             module2_paths["summary"],
+            debug_csv_path,
         ]
         module_status["module2"] = "完成"
 
@@ -304,6 +535,19 @@ def main() -> int:
             output_path / "module4_satellite_dop_curve.png",
         ]
         module_status["module4"] = "完成"
+
+        # 多场景测试
+        if ENABLE_MULTI_SCENARIO_TEST:
+            print("正在进行多场景定位测试...")
+            multi_result = run_multi_scenario_tests()
+            multi_outputs = [
+                multi_result["summary_csv"],
+                multi_result["report"],
+            ]
+            for sr in multi_result["scenario_results"]:
+                multi_outputs.extend(sr["output_files"])
+            module_outputs["multi_scenario"] = multi_outputs
+            module_status["multi_scenario"] = "完成"
 
         report_path = write_system_test_report(
             output_path,

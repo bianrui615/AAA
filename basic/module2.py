@@ -8,7 +8,7 @@ module2.py
 2. 实现轨道摄动修正（delta_u、delta_r、delta_i）；
 3. 实现卫星钟差计算，包括多项式钟差修正和相对论效应修正；
 4. 输出 satellite_debug.csv（含中间调试变量）和卫星位置钟差 CSV；
-5. 输出 corrected_pseudorange.csv（含模拟伪距及已知修正量）。
+5. 输出 module2_pseudorange_correction_debug.csv（伪距修正调试文件，仅用于调试和实验报告展示，不参与 SPP 解算）。
 
 注：核心计算逻辑统一调用 module1.py 的函数，模块二本身为组织与输出层。
 """
@@ -136,16 +136,23 @@ def calculate_satellite_debug_data(
     return records
 
 
-def generate_corrected_pseudorange_records(
+C = 299_792_458.0
+
+
+def generate_pseudorange_correction_debug_records(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     epoch_time: datetime,
     receiver_approx: Tuple[float, float, float],
     rng: Optional[random.Random] = None,
 ) -> List[dict]:
-    """生成模拟伪距记录，并输出各项已知修正量。
+    """生成伪距修正调试记录，用于输出 module2_pseudorange_correction_debug.csv。
 
-    由于伪距由模型模拟生成，本函数直接利用 module3 的模拟伪距生成器，
-    并附加模块二已计算的卫星钟差，用于输出 corrected_pseudorange.csv。
+    说明：
+    - 该文件仅用于模块二调试和实验报告展示；
+    - 用于展示 rho、卫星钟差、SISRE、电离层误差、对流层误差、接收机钟差、
+      噪声与模拟伪距之间的关系；
+    - 该文件不作为模块三 SPP 解算输入；
+    - 模块三和模块四仍使用模拟伪距字典进行定位解算。
 
     参数：
         nav_data: 广播星历字典
@@ -154,7 +161,7 @@ def generate_corrected_pseudorange_records(
         rng: 随机数生成器，保证可复现性
 
     返回：
-        伪距记录列表，每个记录包含原始模拟伪距及各误差项。
+        调试记录列表，每个记录包含几何距离、卫星钟差、各项误差及模拟伪距。
     """
     source = rng or random.Random()
     records: List[dict] = []
@@ -164,6 +171,7 @@ def generate_corrected_pseudorange_records(
             continue
         try:
             sat_pos = compute_satellite_position(eph, epoch_time)
+            clock_bias_s, _ = compute_satellite_clock_bias(eph, epoch_time)
             rec = generate_simulated_pseudorange_record(
                 epoch_time=epoch_time,
                 sat_id=sat_id,
@@ -172,7 +180,12 @@ def generate_corrected_pseudorange_records(
                 health=eph.health,
                 rng=source,
             )
-            rec["corrected_pseudorange"] = rec["simulated_pseudorange"]
+            rec["satellite_clock_bias_s"] = clock_bias_s
+            rec["satellite_clock_correction_m"] = clock_bias_s * C
+            rec["debug_pseudorange"] = rec["simulated_pseudorange"]
+            rec["iono_error"] = rec.get("ionosphere_error")
+            rec["tropo_error"] = rec.get("troposphere_error")
+            rec["debug_note"] = "模拟伪距调试记录，不参与SPP解算"
             records.append(rec)
         except Exception:
             continue
@@ -297,39 +310,47 @@ def save_satellite_debug_csv(
     return csv_path
 
 
-def save_corrected_pseudorange_csv(
-    pseudorange_records: List[dict],
+def save_pseudorange_correction_debug_csv(
+    debug_records: List[dict],
     output_dir: str | Path,
 ) -> Path:
-    """保存 corrected_pseudorange.csv，包含模拟伪距及已知修正量。
+    """保存 module2_pseudorange_correction_debug.csv。
+
+    该文件为模块二调试输出，仅用于展示 rho、卫星钟差、各项误差与模拟伪距
+    之间的关系，不作为模块三 SPP 解算输入。
 
     字段说明：
+    - epoch_time: 观测历元
+    - sat_id: 卫星编号
+    - sat_X, sat_Y, sat_Z: 卫星 ECEF 坐标（m）
+    - health: 卫星健康状态
+    - elevation_deg: 高度角（deg）
     - rho: 几何距离（m）
-    - raw_simulated_pseudorange: 原始模拟伪距（含全部误差，m）
-    - satellite_clock_bias: 卫星钟差（s）
+    - satellite_clock_bias_s: 卫星钟差（s）
     - satellite_clock_correction_m: 卫星钟差距离修正（m）
-    - ionosphere_error: 电离层延迟（m）
-    - troposphere_error: 对流层延迟（m）
+    - sisre_error: SISRE（m）
+    - iono_error: 电离层延迟（m）
+    - tropo_error: 对流层延迟（m）
     - receiver_clock_error: 接收机钟差（m）
     - noise_error: 观测噪声（m）
-    - sisre_error: SISRE（m）
-    - corrected_pseudorange: 修正后伪距（已扣除卫星钟差、电离层、对流层，m）
+    - simulated_pseudorange: 模拟伪距（m）
+    - debug_note: 调试说明
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    csv_path = output_path / "corrected_pseudorange.csv"
+    csv_path = output_path / "module2_pseudorange_correction_debug.csv"
 
     fieldnames = [
         "epoch_time", "sat_id", "sat_X", "sat_Y", "sat_Z", "health",
-        "elevation_deg", "rho", "satellite_clock_bias",
-        "satellite_clock_correction_m", "ionosphere_error", "troposphere_error",
-        "receiver_clock_error", "noise_error", "sisre_error",
-        "raw_simulated_pseudorange", "corrected_pseudorange",
+        "elevation_deg", "rho", "satellite_clock_bias_s",
+        "satellite_clock_correction_m", "sisre_error", "iono_error",
+        "tropo_error", "receiver_clock_error", "noise_error",
+        "simulated_pseudorange", "debug_note",
     ]
     with csv_path.open("w", newline="", encoding="utf-8-sig") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        for rec in pseudorange_records:
+        for rec in debug_records:
             writer.writerow({k: rec.get(k, "") for k in fieldnames})
     return csv_path
 
@@ -352,7 +373,7 @@ if __name__ == "__main__":
     debug_path = save_satellite_debug_csv(debug_rows, "output")
     print(f"satellite_debug.csv saved: {debug_path}")
 
-    # 3. 输出 corrected_pseudorange.csv（模拟伪距及修正量）
-    pseudo_rows = generate_corrected_pseudorange_records(nav, test_epoch, receiver_approx, rng=rng)
-    pseudo_path = save_corrected_pseudorange_csv(pseudo_rows, "output")
-    print(f"corrected_pseudorange.csv saved: {pseudo_path}")
+    # 3. 输出 module2_pseudorange_correction_debug.csv（伪距修正调试文件）
+    debug_rows = generate_pseudorange_correction_debug_records(nav, test_epoch, receiver_approx, rng=rng)
+    debug_path = save_pseudorange_correction_debug_csv(debug_rows, "output")
+    print(f"module2_pseudorange_correction_debug.csv saved: {debug_path}")
