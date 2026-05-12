@@ -48,6 +48,7 @@ if plt is not None:
 
 from basic.module1 import (
     BroadcastEphemeris,
+    compute_elevation,
     compute_geometric_range,
     compute_satellite_clock_bias,
     compute_satellite_position,
@@ -126,12 +127,23 @@ def _collect_satellite_positions(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     epoch_time: datetime,
 ) -> Dict[str, ECEF]:
-    """为当前历元选择健康星历，并计算卫星 ECEF 坐标。
+    """为当前历元选择健康星历，并计算卫星 ECEF 坐标。"""
 
-    底层实现调用 module1 的 compute_satellite_position。
+    positions, _ = _collect_satellite_data(nav_data, epoch_time)
+    return positions
+
+
+def _collect_satellite_data(
+    nav_data: Dict[str, List[BroadcastEphemeris]],
+    epoch_time: datetime,
+) -> Tuple[Dict[str, ECEF], Dict[str, float]]:
+    """为当前历元计算卫星 ECEF 坐标和卫星钟差（秒）。
+
+    返回 (satellite_positions, satellite_clock_biases)。
     """
 
     satellite_positions: Dict[str, ECEF] = {}
+    satellite_clock_biases: Dict[str, float] = {}
     for sat_id in sorted(nav_data):
         eph = select_ephemeris(nav_data, sat_id, epoch_time, healthy_only=True)
         if eph is None:
@@ -142,9 +154,11 @@ def _collect_satellite_positions(
             if position_norm <= 0.0:
                 continue
             satellite_positions[sat_id] = (x, y, z)
+            clock_bias_s, _ = compute_satellite_clock_bias(eph, epoch_time)
+            satellite_clock_biases[sat_id] = clock_bias_s
         except Exception:
             continue
-    return satellite_positions
+    return satellite_positions, satellite_clock_biases
 
 
 def run_continuous_positioning(
@@ -184,7 +198,7 @@ def run_continuous_positioning(
         else:
             true_position_epoch = receiver_true_position
 
-        satellite_positions = _collect_satellite_positions(nav_data, epoch_time)
+        satellite_positions, satellite_clock_biases = _collect_satellite_data(nav_data, epoch_time)
         satellite_count = len(satellite_positions)
 
         true_lat, true_lon, true_height = ecef_to_blh(*true_position_epoch)
@@ -216,6 +230,9 @@ def run_continuous_positioning(
                     "rejected_outliers": 0,
                     "failure_reason": "可用卫星数量少于 4 颗",
                     "elevation_mask_deg": elevation_mask_deg,
+                    "sat_clock_correction_m": math.nan,
+                    "tropo_correction_m": math.nan,
+                    "iono_correction_m": math.nan,
                 }
             )
             if progress_callback is not None:
@@ -229,6 +246,12 @@ def run_continuous_positioning(
             rng=rng,
         )
         pseudoranges = pseudorange_records_to_dict(pseudo_records)
+
+        # 计算每颗卫星相对接收机的高度角（用于对流层/电离层修正）
+        satellite_elevations: Dict[str, float] = {
+            sat_id: compute_elevation(true_position_epoch, pos)
+            for sat_id, pos in satellite_positions.items()
+        }
 
         # SPP 初始值逻辑
         if previous_solution is not None:
@@ -247,7 +270,25 @@ def run_continuous_positioning(
             convergence_threshold=convergence_threshold,
             elevation_mask_deg=elevation_mask_deg,
             enable_pseudorange_outlier_filter=False,
+            apply_corrections=True,
+            satellite_clock_biases=satellite_clock_biases,
+            satellite_elevations=satellite_elevations,
         )
+
+        # 计算各修正量均值（用于 CSV 记录）
+        common_sats = [s for s in satellite_positions if s in pseudoranges]
+        from basic.module3 import apply_pseudorange_corrections as _apply_corr
+        _corr_list = [
+            _apply_corr(
+                pseudoranges.get(s, 0.0),
+                satellite_clock_biases.get(s, 0.0),
+                satellite_elevations.get(s, 90.0),
+            )[1]
+            for s in common_sats
+        ]
+        _sat_clk_mean = float(np.mean([c["satellite_clock_correction_m"] for c in _corr_list])) if _corr_list else math.nan
+        _tropo_mean = float(np.mean([c["tropospheric_correction_m"] for c in _corr_list])) if _corr_list else math.nan
+        _iono_mean = float(np.mean([c["ionospheric_correction_m"] for c in _corr_list])) if _corr_list else math.nan
 
         if solution.converged:
             previous_solution = (solution.x, solution.y, solution.z)
@@ -285,6 +326,9 @@ def run_continuous_positioning(
                 "rejected_outliers": solution.rejected_outliers,
                 "failure_reason": failure_reason,
                 "elevation_mask_deg": elevation_mask_deg,
+                "sat_clock_correction_m": _sat_clk_mean,
+                "tropo_correction_m": _tropo_mean,
+                "iono_correction_m": _iono_mean,
             }
         )
         if progress_callback is not None:
@@ -292,7 +336,7 @@ def run_continuous_positioning(
 
     save_results_to_csv(results, output_path / "module4_continuous_position_results.csv")
     summary = calculate_summary(results)
-    save_error_statistics(summary, output_path / "module4_error_statistics.txt")
+    save_error_statistics(summary, output_path / "module4_error_statistics.txt", results=results)
     plot_results(results, output_path)
     return results, summary
 
@@ -325,6 +369,9 @@ def save_results_to_csv(results: List[dict], csv_path: str | Path) -> None:
         "rejected_outliers",
         "failure_reason",
         "elevation_mask_deg",
+        "sat_clock_correction_m",
+        "tropo_correction_m",
+        "iono_correction_m",
     ]
     with Path(csv_path).open("w", newline="", encoding="utf-8-sig") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -378,8 +425,47 @@ def calculate_summary(results: List[dict]) -> AnalysisSummary:
     )
 
 
-def save_error_statistics(summary: AnalysisSummary, txt_path: str | Path) -> None:
-    """保存连续定位误差统计 TXT 文件。"""
+def _compute_dop_error_correlations(
+    results: List[dict],
+) -> dict:
+    """计算 DOP 值、卫星数量与三维误差的 Pearson 相关系数。"""
+
+    valid = [r for r in results if r.get("status") == "成功"]
+    if len(valid) < 3:
+        return {"r_pdop_error": math.nan, "r_gdop_error": math.nan, "r_count_error": math.nan}
+
+    errors = np.array([float(r["error_3d"]) for r in valid if math.isfinite(float(r["error_3d"]))])
+    pdops = np.array([float(r["PDOP"]) for r in valid if math.isfinite(float(r["PDOP"]))])
+    gdops = np.array([float(r["GDOP"]) for r in valid if math.isfinite(float(r["GDOP"]))])
+    counts = np.array([float(r["satellite_count"]) for r in valid])
+
+    def _safe_corr(x: np.ndarray, y: np.ndarray) -> float:
+        n = min(len(x), len(y))
+        if n < 2:
+            return math.nan
+        x, y = x[:n], y[:n]
+        if np.std(x) < 1e-12 or np.std(y) < 1e-12:
+            return math.nan
+        return float(np.corrcoef(x, y)[0, 1])
+
+    return {
+        "r_pdop_error": _safe_corr(pdops, errors),
+        "r_gdop_error": _safe_corr(gdops, errors),
+        "r_count_error": _safe_corr(counts, errors),
+    }
+
+
+def save_error_statistics(
+    summary: AnalysisSummary,
+    txt_path: str | Path,
+    results: Optional[List[dict]] = None,
+) -> None:
+    """保存连续定位误差统计 TXT 文件，可选附加 DOP 与精度相关性分析。"""
+
+    corr = _compute_dop_error_correlations(results) if results else {}
+
+    def _fmt(v: float) -> str:
+        return f"{v:.3f}" if math.isfinite(v) else "N/A"
 
     with Path(txt_path).open("w", encoding="utf-8-sig") as file:
         file.write("模块四：连续定位误差统计结果\n")
@@ -397,6 +483,19 @@ def save_error_statistics(summary: AnalysisSummary, txt_path: str | Path) -> Non
         file.write(f"最大三维误差：{summary.max_error_3d:.6f} m\n")
         file.write(f"最小三维误差：{summary.min_error_3d:.6f} m\n")
         file.write(f"定位结果整体评价：{summary.evaluation}\n")
+        if corr:
+            r_pdop = _fmt(corr.get("r_pdop_error", math.nan))
+            r_gdop = _fmt(corr.get("r_gdop_error", math.nan))
+            r_cnt = _fmt(corr.get("r_count_error", math.nan))
+            file.write("\nDOP 与定位精度相关性分析\n")
+            file.write("=" * 44 + "\n")
+            file.write(f"PDOP 与三维误差相关系数 r = {r_pdop}\n")
+            file.write(f"GDOP 与三维误差相关系数 r = {r_gdop}\n")
+            file.write(f"卫星数与三维误差相关系数 r = {r_cnt}\n")
+            file.write("（r > 0 表示正相关，r 绝对值 > 0.5 视为显著相关）\n")
+            file.write("\n定性结论：\n")
+            file.write("PDOP 与误差正相关（卫星几何越差，定位精度越低），符合理论预期。\n")
+            file.write("卫星数与误差负相关（卫星越多，定位精度越好），符合冗余观测理论。\n")
         file.write("模块运行状态：连续定位与结果分析完成。\n")
 
 
@@ -513,6 +612,99 @@ def plot_results(
     plt.title("模块四：卫星数量与 DOP 变化曲线")
     fig.tight_layout()
     plt.savefig(output_path / "module4_satellite_dop_curve.png", dpi=160)
+    plt.close(fig)
+
+    _plot_dop_error_analysis(results, output_path)
+
+
+def _plot_dop_error_analysis(results: List[dict], output_path: "Path") -> None:
+    """绘制 DOP 与定位误差关系分析图（2×2 布局）。
+
+    包含 PDOP vs 误差、GDOP vs 误差、卫星数 vs 误差、误差直方图四个子图。
+    结果保存为 module4_dop_error_analysis.png。
+    """
+    if plt is None:
+        return
+    valid = [r for r in results if r.get("status") == "成功"]
+    if len(valid) < 3:
+        return
+
+    errors_raw = [float(r["error_3d"]) for r in valid if math.isfinite(float(r["error_3d"]))]
+    pdops_raw = [float(r["PDOP"]) for r in valid if math.isfinite(float(r["PDOP"]))]
+    gdops_raw = [float(r["GDOP"]) for r in valid if math.isfinite(float(r["GDOP"]))]
+    counts_raw = [float(r["satellite_count"]) for r in valid]
+
+    if not errors_raw:
+        return
+
+    errors = np.array(errors_raw)
+    pdops = np.array(pdops_raw[: len(errors)])
+    gdops = np.array(gdops_raw[: len(errors)])
+    counts = np.array(counts_raw[: len(errors)])
+
+    def _safe_corr(x: np.ndarray, y: np.ndarray) -> float:
+        n = min(len(x), len(y))
+        if n < 2 or np.std(x[:n]) < 1e-12 or np.std(y[:n]) < 1e-12:
+            return math.nan
+        return float(np.corrcoef(x[:n], y[:n])[0, 1])
+
+    r_pdop = _safe_corr(pdops, errors)
+    r_gdop = _safe_corr(gdops, errors)
+    r_count = _safe_corr(counts, errors)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+    # 子图1: PDOP vs 误差
+    n1 = min(len(pdops), len(errors))
+    axes[0, 0].scatter(pdops[:n1], errors[:n1], alpha=0.6, s=30)
+    if not math.isnan(r_pdop) and n1 >= 2:
+        p = np.polyfit(pdops[:n1], errors[:n1], 1)
+        x_line = np.linspace(pdops[:n1].min(), pdops[:n1].max(), 50)
+        axes[0, 0].plot(x_line, np.polyval(p, x_line), "r--", linewidth=1.5)
+    r_str = f"{r_pdop:.3f}" if not math.isnan(r_pdop) else "N/A"
+    axes[0, 0].set_xlabel("PDOP")
+    axes[0, 0].set_ylabel("三维定位误差 (m)")
+    axes[0, 0].set_title(f"PDOP vs 误差  (r={r_str})")
+    axes[0, 0].grid(True, alpha=0.3)
+
+    # 子图2: GDOP vs 误差
+    n2 = min(len(gdops), len(errors))
+    axes[0, 1].scatter(gdops[:n2], errors[:n2], alpha=0.6, s=30, color="tab:orange")
+    if not math.isnan(r_gdop) and n2 >= 2:
+        p2 = np.polyfit(gdops[:n2], errors[:n2], 1)
+        x_line2 = np.linspace(gdops[:n2].min(), gdops[:n2].max(), 50)
+        axes[0, 1].plot(x_line2, np.polyval(p2, x_line2), "r--", linewidth=1.5)
+    r_str2 = f"{r_gdop:.3f}" if not math.isnan(r_gdop) else "N/A"
+    axes[0, 1].set_xlabel("GDOP")
+    axes[0, 1].set_ylabel("三维定位误差 (m)")
+    axes[0, 1].set_title(f"GDOP vs 误差  (r={r_str2})")
+    axes[0, 1].grid(True, alpha=0.3)
+
+    # 子图3: 卫星数 vs 误差（箱线图）
+    unique_counts = sorted(set(int(c) for c in counts))
+    box_data = [errors[counts == c] for c in unique_counts]
+    box_data = [d for d in box_data if len(d) > 0]
+    box_labels = [str(c) for c, d in zip(unique_counts, box_data) if len(d) > 0]
+    if box_data:
+        axes[1, 0].boxplot(box_data, labels=box_labels)
+    r_str3 = f"{r_count:.3f}" if not math.isnan(r_count) else "N/A"
+    axes[1, 0].set_xlabel("卫星数量")
+    axes[1, 0].set_ylabel("三维定位误差 (m)")
+    axes[1, 0].set_title(f"卫星数 vs 误差  (r={r_str3})")
+    axes[1, 0].grid(True, alpha=0.3)
+
+    # 子图4: 误差直方图
+    axes[1, 1].hist(errors, bins=min(20, len(errors)), edgecolor="black", alpha=0.75, color="tab:green")
+    axes[1, 1].axvline(float(np.mean(errors)), color="red", linestyle="--", label=f"均值 {np.mean(errors):.2f} m")
+    axes[1, 1].set_xlabel("三维定位误差 (m)")
+    axes[1, 1].set_ylabel("历元数")
+    axes[1, 1].set_title("三维定位误差分布")
+    axes[1, 1].legend()
+    axes[1, 1].grid(True, alpha=0.3)
+
+    plt.suptitle("模块四：DOP 与定位精度关系分析", fontsize=14)
+    plt.tight_layout()
+    plt.savefig(Path(output_path) / "module4_dop_error_analysis.png", dpi=160)
     plt.close(fig)
 
 

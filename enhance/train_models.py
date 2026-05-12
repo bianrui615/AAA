@@ -17,7 +17,7 @@ import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV, train_test_split
 
 from enhance.enhance_config import (
     BASE_OUTPUT_DIR,
@@ -53,8 +53,16 @@ def train_models(
     dataset_path: Path,
     test_size: float = 0.3,
     random_state: int = 2026,
+    enable_grid_search: bool = False,
 ) -> Dict[str, any]:
-    """训练线性回归和随机森林模型，保存模型并返回划分信息及测试集元数据。"""
+    """训练线性回归和随机森林模型，保存模型并返回划分信息及测试集元数据。
+
+    参数:
+        dataset_path: ml_dataset.csv 路径
+        test_size: 测试集比例，默认 0.3
+        random_state: 随机种子
+        enable_grid_search: 是否启用 GridSearchCV 调优随机森林超参数（默认关闭）
+    """
     print("[train_models] 开始加载数据集并训练模型...")
     rows, X, y = load_dataset(dataset_path)
     n_samples = X.shape[0]
@@ -95,15 +103,33 @@ def train_models(
     joblib.dump(lr_model, lr_path)
     print(f"[train_models] LinearRegression 已保存：{lr_path}")
 
-    # 2. 随机森林
-    print("[train_models] 训练 RandomForestRegressor...")
-    rf_model = RandomForestRegressor(
-        n_estimators=200,
-        random_state=2026,
-        max_depth=10,
-        n_jobs=-1,
-    )
-    rf_model.fit(X_train, y_train)
+    # 2. 随机森林（可选 GridSearchCV 超参数调优）
+    if enable_grid_search:
+        print("[train_models] 启用 GridSearchCV 调优 RandomForestRegressor...")
+        param_grid = {
+            "n_estimators": [100, 200, 400],
+            "max_depth": [5, 10, 20, None],
+            "min_samples_split": [2, 5, 10],
+        }
+        rf_grid = GridSearchCV(
+            RandomForestRegressor(random_state=random_state, n_jobs=-1),
+            param_grid,
+            cv=5,
+            scoring="neg_mean_squared_error",
+            n_jobs=-1,
+        )
+        rf_grid.fit(X_train, y_train)
+        rf_model = rf_grid.best_estimator_
+        print(f"[train_models] GridSearch 最佳参数：{rf_grid.best_params_}")
+    else:
+        print("[train_models] 训练 RandomForestRegressor...")
+        rf_model = RandomForestRegressor(
+            n_estimators=200,
+            random_state=random_state,
+            max_depth=10,
+            n_jobs=-1,
+        )
+        rf_model.fit(X_train, y_train)
     rf_path = MODEL_OUTPUT_DIR / "random_forest_model.joblib"
     joblib.dump(rf_model, rf_path)
     print(f"[train_models] RandomForestRegressor 已保存：{rf_path}")

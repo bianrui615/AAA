@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"e:\\\\学习工作\\\\中级项目课\\\\AAA\\\\nav\" -ErrorAction SilentlyContinue)",
+      "Bash(python -c \"import basic.module3; print\\('module3 OK'\\)\")",
+      "Bash(python -c \"import basic.module4; print\\('module4 OK'\\)\")",
+      "Bash(python -c \"import enhance.enhance_config; import enhance.train_models; import enhance.dataset_builder; print\\('enhance modules OK'\\)\")",
+      "Bash(python -c \"import enhance.enhance_gui; print\\('enhance_gui OK'\\)\")",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

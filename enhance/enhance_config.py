@@ -37,15 +37,15 @@ MODEL_OUTPUT_DIR = BASE_OUTPUT_DIR / "models"
 PREDICTION_OUTPUT_DIR = BASE_OUTPUT_DIR / "predictions"
 FIGURE_OUTPUT_DIR = BASE_OUTPUT_DIR / "figures"
 
-# 至少 3 个不同场景，使用同一个 CNAV 文件但改变时间、坐标、种子、高度角阈值
+# 3 个不同场景，每场景 2 小时 × 30 秒采样 = 241 历元，总计约 720 样本
 SCENARIOS: List[ScenarioConfig] = [
     ScenarioConfig(
         name="scenario_1_default",
         nav_file_path="nav/tarc0910.26b_cnav",
         receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
         start_time=datetime(2026, 4, 1, 0, 0, 0),
-        end_time=datetime(2026, 4, 1, 1, 0, 0),
-        interval_seconds=300,
+        end_time=datetime(2026, 4, 1, 2, 0, 0),
+        interval_seconds=30,
         random_seed=2026,
         max_iter=12,
         convergence_threshold=1e-4,
@@ -53,27 +53,27 @@ SCENARIOS: List[ScenarioConfig] = [
     ),
     ScenarioConfig(
         name="scenario_2_different_seed",
-        nav_file_path="nav/tarc0910.26b_cnav",
-        receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
-        start_time=datetime(2026, 4, 1, 0, 0, 0),
-        end_time=datetime(2026, 4, 1, 1, 0, 0),
-        interval_seconds=300,
+        nav_file_path="nav/tarc1210.26b_cnav",
+        receiver_true_position=(-2350000.0, 5100000.0, 3150000.0),
+        start_time=datetime(2026, 5, 1, 0, 0, 0),
+        end_time=datetime(2026, 5, 1, 2, 0, 0),
+        interval_seconds=30,
         random_seed=42,
         max_iter=12,
         convergence_threshold=1e-4,
         elevation_mask_deg=0.0,
     ),
     ScenarioConfig(
-        name="scenario_3_different_time",
-        nav_file_path="nav/tarc0910.26b_cnav",
-        receiver_true_position=(-2270000.0, 5009000.0, 3220000.0),
-        start_time=datetime(2026, 4, 1, 2, 0, 0),
-        end_time=datetime(2026, 4, 1, 3, 0, 0),
-        interval_seconds=300,
-        random_seed=2026,
+        name="scenario_3_elevation_mask",
+        nav_file_path="nav/tarc1230.26b_cnav",
+        receiver_true_position=(-2200000.0, 4950000.0, 3300000.0),
+        start_time=datetime(2026, 5, 3, 0, 0, 0),
+        end_time=datetime(2026, 5, 3, 2, 0, 0),
+        interval_seconds=30,
+        random_seed=2027,
         max_iter=12,
         convergence_threshold=1e-4,
-        elevation_mask_deg=5.0,
+        elevation_mask_deg=10.0,
     ),
 ]
 
