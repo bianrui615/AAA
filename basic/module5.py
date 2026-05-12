@@ -126,32 +126,30 @@ class ScenarioConfig:
     receiver_initial_position: ECEF = (0.0, 0.0, 0.0)
     receiver_velocity_mps: ECEF = (0.0, 0.0, 0.0)
     receiver_initial_approx_position: ECEF = (0.0, 0.0, 0.0)
+    trajectory_points: Optional[List[tuple[float, float, float, float]]] = None
 
 
 SCENARIOS = [
     ScenarioConfig(
-        name="scenario_1_default",
-        nav_file_path=NAV_FILE_PATH,
-        receiver_true_position=RECEIVER_TRUE_POSITION,
-        start_time=SIMULATION_START_TIME,
-        end_time=SIMULATION_END_TIME,
-        interval_seconds=SAMPLING_INTERVAL_SECONDS,
+        name="scenario_1_static_beijing",
+        nav_file_path="nav/tarc0910.26b_cnav",
+        receiver_true_position=(-2113219.591206, 4332742.245951, 4162446.162752),
+        start_time=datetime(2026, 4, 1, 0, 0, 0),
+        end_time=datetime(2026, 4, 1, 6, 0, 0),
+        interval_seconds=300,
         random_seed=RANDOM_SEED,
         max_iter=MAX_ITERATIONS,
         convergence_threshold=CONVERGENCE_THRESHOLD,
         elevation_mask_deg=ELEVATION_MASK_DEG,
-        enable_receiver_motion=True,
-        receiver_initial_position=RECEIVER_INITIAL_POSITION,
-        receiver_velocity_mps=RECEIVER_VELOCITY_ECEF_MPS,
-        receiver_initial_approx_position=RECEIVER_INITIAL_APPROX_POSITION,
+        enable_receiver_motion=False,
     ),
     ScenarioConfig(
-        name="scenario_2_different_seed",
-        nav_file_path=NAV_FILE_PATH,
-        receiver_true_position=RECEIVER_TRUE_POSITION,
-        start_time=SIMULATION_START_TIME,
-        end_time=SIMULATION_END_TIME,
-        interval_seconds=SAMPLING_INTERVAL_SECONDS,
+        name="scenario_2_static_shanghai",
+        nav_file_path="nav/tarc1210.26b_cnav",
+        receiver_true_position=(-2850082.437515, 4655707.465540, 3287773.525670),
+        start_time=datetime(2026, 5, 1, 7, 0, 0),
+        end_time=datetime(2026, 5, 1, 13, 0, 0),
+        interval_seconds=300,
         random_seed=42,
         max_iter=MAX_ITERATIONS,
         convergence_threshold=CONVERGENCE_THRESHOLD,
@@ -159,20 +157,57 @@ SCENARIOS = [
         enable_receiver_motion=False,
     ),
     ScenarioConfig(
-        name="scenario_3_elevation_mask",
-        nav_file_path=NAV_FILE_PATH,
-        receiver_true_position=(-2270000.0, 5009000.0, 3220000.0),
-        start_time=SIMULATION_START_TIME,
-        end_time=SIMULATION_END_TIME,
-        interval_seconds=SAMPLING_INTERVAL_SECONDS,
+        name="scenario_3_static_guangzhou",
+        nav_file_path="nav/tarc1220.26b_cnav",
+        receiver_true_position=(-2317919.589073, 5391367.562679, 2489881.494112),
+        start_time=datetime(2026, 5, 2, 0, 0, 0),
+        end_time=datetime(2026, 5, 2, 6, 0, 0),
+        interval_seconds=300,
         random_seed=RANDOM_SEED,
         max_iter=MAX_ITERATIONS,
         convergence_threshold=CONVERGENCE_THRESHOLD,
         elevation_mask_deg=10.0,
+        enable_receiver_motion=False,
+    ),
+    ScenarioConfig(
+        name="scenario_4_dynamic_linear_xian",
+        nav_file_path="nav/tarc1230.26b_cnav",
+        receiver_true_position=(-1711256.263983, 4986864.076811, 3578022.872551),
+        start_time=datetime(2026, 5, 3, 0, 0, 0),
+        end_time=datetime(2026, 5, 3, 6, 0, 0),
+        interval_seconds=300,
+        random_seed=RANDOM_SEED,
+        max_iter=MAX_ITERATIONS,
+        convergence_threshold=CONVERGENCE_THRESHOLD,
+        elevation_mask_deg=ELEVATION_MASK_DEG,
         enable_receiver_motion=True,
-        receiver_initial_position=(-2270000.0, 5009000.0, 3220000.0),
-        receiver_velocity_mps=(0.3, 0.1, 0.05),
-        receiver_initial_approx_position=(-2269950.0, 5009050.0, 3220030.0),
+        receiver_initial_position=(-1711256.263983, 4986864.076811, 3578022.872551),
+        receiver_velocity_mps=(0.5, 0.2, 0.1),
+        receiver_initial_approx_position=(-1711206.263983, 4986814.076811, 3578052.872551),
+    ),
+    ScenarioConfig(
+        name="scenario_5_dynamic_polyline_chengdu",
+        nav_file_path="nav/tarc1240.26b_cnav",
+        receiver_true_position=(-1335980.378283, 5331834.889406, 3225460.225122),
+        start_time=datetime(2026, 5, 4, 0, 0, 0),
+        end_time=datetime(2026, 5, 4, 6, 0, 0),
+        interval_seconds=300,
+        random_seed=2027,
+        max_iter=MAX_ITERATIONS,
+        convergence_threshold=CONVERGENCE_THRESHOLD,
+        elevation_mask_deg=ELEVATION_MASK_DEG,
+        enable_receiver_motion=True,
+        receiver_initial_position=(-1335980.378283, 5331834.889406, 3225460.225122),
+        receiver_initial_approx_position=(-1335930.378283, 5331784.889406, 3225490.225122),
+        trajectory_points=[
+            (0, 0, 0, 0),
+            (3600, 800, 300, 100),
+            (7200, 1500, 900, 300),
+            (10800, 2100, 1500, 600),
+            (14400, 2800, 2200, 900),
+            (18000, 3400, 2800, 1200),
+            (21600, 4000, 3500, 1500),
+        ],
     ),
 ]
 
@@ -183,6 +218,76 @@ def _format_float(value: float, digits: int = 3) -> str:
     if value is None or not math.isfinite(value):
         return "NaN"
     return f"{value:.{digits}f}"
+
+
+def _scenario_duration_seconds(scenario: ScenarioConfig) -> float:
+    return (scenario.end_time - scenario.start_time).total_seconds()
+
+
+def _scenario_expected_epochs(scenario: ScenarioConfig) -> int:
+    if scenario.interval_seconds <= 0:
+        return 0
+    return int(_scenario_duration_seconds(scenario) // scenario.interval_seconds) + 1
+
+
+def _build_polyline_receiver_trajectory(
+    start_time: datetime,
+    end_time: datetime,
+    initial_position: ECEF,
+    trajectory_points: List[tuple[float, float, float, float]],
+):
+    points = sorted(trajectory_points, key=lambda item: item[0])
+    if not points:
+        raise ValueError("折线轨迹点不能为空")
+    duration_seconds = (end_time - start_time).total_seconds()
+    if points[0][0] > 0 or points[-1][0] < duration_seconds:
+        raise ValueError("折线轨迹点必须覆盖完整解算时间范围")
+
+    def interpolate(epoch_time: datetime) -> ECEF:
+        dt = (epoch_time - start_time).total_seconds()
+        if dt <= points[0][0]:
+            offset = points[0][1:]
+        elif dt >= points[-1][0]:
+            offset = points[-1][1:]
+        else:
+            offset = points[-1][1:]
+            for left, right in zip(points, points[1:]):
+                t0, x0, y0, z0 = left
+                t1, x1, y1, z1 = right
+                if t0 <= dt <= t1:
+                    ratio = 0.0 if abs(t1 - t0) < 1e-12 else (dt - t0) / (t1 - t0)
+                    offset = (
+                        x0 + ratio * (x1 - x0),
+                        y0 + ratio * (y1 - y0),
+                        z0 + ratio * (z1 - z0),
+                    )
+                    break
+        return (
+            initial_position[0] + offset[0],
+            initial_position[1] + offset[1],
+            initial_position[2] + offset[2],
+        )
+
+    return interpolate
+
+
+def _failed_scenario_summary(scenario: ScenarioConfig, failure_reason: str) -> AnalysisSummary:
+    total_epochs = _scenario_expected_epochs(scenario)
+    return AnalysisSummary(
+        total_epochs=total_epochs,
+        success_epochs=0,
+        failed_epochs=total_epochs,
+        average_satellite_count=math.nan,
+        average_pdop=math.nan,
+        average_gdop=math.nan,
+        mean_error_3d=math.nan,
+        rms_error_3d=math.nan,
+        max_error_3d=math.nan,
+        min_error_3d=math.nan,
+        success_rate=0.0,
+        evaluation=f"场景运行失败：{failure_reason}",
+        elevation_mask_deg=scenario.elevation_mask_deg,
+    )
 
 
 def _collect_satellite_data_from_module1(
@@ -325,49 +430,72 @@ def run_single_scenario_test(
 
     output_dir = Path(base_output_dir) / scenario.name
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    nav_data, _ = parse_nav_file(scenario.nav_file_path)
-
-    # 根据场景配置构造接收机轨迹
-    if scenario.enable_receiver_motion:
-        receiver_trajectory = build_linear_receiver_trajectory(
-            scenario.start_time,
-            scenario.receiver_initial_position,
-            scenario.receiver_velocity_mps,
-        )
-        receiver_initial_approx = scenario.receiver_initial_approx_position
-    else:
-        receiver_trajectory = None
-        receiver_initial_approx = None
-
-    _, summary = run_continuous_positioning(
-        nav_data=nav_data,
-        start_time=scenario.start_time,
-        end_time=scenario.end_time,
-        interval_seconds=scenario.interval_seconds,
-        receiver_true_position=scenario.receiver_true_position,
-        output_dir=output_dir,
-        random_seed=scenario.random_seed,
-        max_iter=scenario.max_iter,
-        convergence_threshold=scenario.convergence_threshold,
-        elevation_mask_deg=scenario.elevation_mask_deg,
-        receiver_trajectory=receiver_trajectory,
-        receiver_initial_approx=receiver_initial_approx,
-    )
-
+    failure_reason = ""
     output_files = [
         output_dir / "module4_continuous_position_results.csv",
         output_dir / "module4_error_statistics.txt",
         output_dir / "module4_error_curve.png",
         output_dir / "module4_trajectory.png",
+        output_dir / "module4_true_vs_estimated_trajectory.png",
         output_dir / "module4_satellite_dop_curve.png",
+        output_dir / "module4_dop_error_analysis.png",
     ]
+
+    try:
+        if _scenario_duration_seconds(scenario) != 6 * 3600:
+            raise ValueError("场景起止时间不是 6 小时")
+
+        nav_data, _ = parse_nav_file(scenario.nav_file_path)
+
+        # 根据场景配置构造接收机轨迹
+        if scenario.enable_receiver_motion and scenario.trajectory_points:
+            receiver_trajectory = _build_polyline_receiver_trajectory(
+                scenario.start_time,
+                scenario.end_time,
+                scenario.receiver_initial_position,
+                scenario.trajectory_points,
+            )
+            receiver_initial_approx = scenario.receiver_initial_approx_position
+        elif scenario.enable_receiver_motion:
+            receiver_trajectory = build_linear_receiver_trajectory(
+                scenario.start_time,
+                scenario.receiver_initial_position,
+                scenario.receiver_velocity_mps,
+            )
+            receiver_initial_approx = scenario.receiver_initial_approx_position
+        else:
+            receiver_trajectory = None
+            receiver_initial_approx = None
+
+        _, summary = run_continuous_positioning(
+            nav_data=nav_data,
+            start_time=scenario.start_time,
+            end_time=scenario.end_time,
+            interval_seconds=scenario.interval_seconds,
+            receiver_true_position=scenario.receiver_true_position,
+            output_dir=output_dir,
+            random_seed=scenario.random_seed,
+            max_iter=scenario.max_iter,
+            convergence_threshold=scenario.convergence_threshold,
+            elevation_mask_deg=scenario.elevation_mask_deg,
+            receiver_trajectory=receiver_trajectory,
+            receiver_initial_approx=receiver_initial_approx,
+        )
+        succeeded = True
+    except Exception as exc:
+        failure_reason = str(exc)
+        summary = _failed_scenario_summary(scenario, failure_reason)
+        succeeded = False
 
     return {
         "scenario": scenario,
         "summary": summary,
         "output_dir": output_dir,
-        "output_files": output_files,
+        "output_files": output_files if succeeded else [],
+        "succeeded": succeeded,
+        "failure_reason": failure_reason,
+        "expected_epochs": _scenario_expected_epochs(scenario),
+        "duration_hours": _scenario_duration_seconds(scenario) / 3600.0,
     }
 
 
@@ -382,10 +510,13 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
         result = run_single_scenario_test(scenario, base_output_dir)
         scenario_results.append(result)
         summary = result["summary"]
-        print(
-            f"    完成：成功率 {summary.success_rate * 100:.2f}%，"
-            f"平均误差 {_format_float(summary.mean_error_3d, 3)} m"
-        )
+        if result["succeeded"]:
+            print(
+                f"    完成：成功率 {summary.success_rate * 100:.2f}%，"
+                f"总历元 {summary.total_epochs}，平均误差 {_format_float(summary.mean_error_3d, 3)} m"
+            )
+        else:
+            print(f"    失败：{result['failure_reason']}")
 
     # 汇总 CSV
     summary_csv_path = base_output_dir / "module5_multi_scenario_summary.csv"
@@ -395,14 +526,19 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
             "scenario_name", "nav_file_path",
             "receiver_x", "receiver_y", "receiver_z",
             "start_time", "end_time", "interval_seconds", "random_seed",
+            "duration_hours", "expected_epochs",
             "total_epochs", "success_epochs", "failed_epochs", "success_rate",
             "average_satellite_count", "average_pdop", "average_gdop",
             "mean_error_3d", "rms_error_3d", "max_error_3d", "output_dir",
             "enable_receiver_motion", "receiver_velocity_x", "receiver_velocity_y", "receiver_velocity_z",
+            "trajectory_type", "succeeded", "failure_reason",
         ])
         for result in scenario_results:
             s = result["scenario"]
             summary = result["summary"]
+            trajectory_type = (
+                "polyline" if s.trajectory_points else "linear" if s.enable_receiver_motion else "static"
+            )
             writer.writerow([
                 s.name,
                 s.nav_file_path,
@@ -413,6 +549,8 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
                 s.end_time.isoformat(sep=" "),
                 s.interval_seconds,
                 s.random_seed,
+                result["duration_hours"],
+                result["expected_epochs"],
                 summary.total_epochs,
                 summary.success_epochs,
                 summary.failed_epochs,
@@ -428,6 +566,9 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
                 s.receiver_velocity_mps[0],
                 s.receiver_velocity_mps[1],
                 s.receiver_velocity_mps[2],
+                trajectory_type,
+                result["succeeded"],
+                result["failure_reason"],
             ])
 
     # 多场景测试报告
@@ -435,8 +576,8 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
     with report_path.open("w", encoding="utf-8-sig") as f:
         f.write("模块五：多场景定位测试报告\n")
         f.write("=" * 50 + "\n")
-        f.write("测试目的：验证北斗定位解算系统在不同随机种子、接收机坐标\n")
-        f.write("和高度角阈值等参数变化下的鲁棒性与稳定性。\n\n")
+        f.write("测试目的：验证 5 个 6 小时连续定位场景下的鲁棒性与稳定性。\n")
+        f.write("场景 1-3 为不同地点静态接收机，场景 4-5 为不同轨迹动态接收机。\n\n")
 
         for idx, result in enumerate(scenario_results, 1):
             s = result["scenario"]
@@ -453,12 +594,24 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
                 f"  仿真时间：{s.start_time.isoformat(sep=' ')} 至 "
                 f"{s.end_time.isoformat(sep=' ')}\n"
             )
+            f.write(f"  解算时长：{result['duration_hours']:.2f} 小时\n")
             f.write(f"  采样间隔：{s.interval_seconds} s\n")
+            f.write(f"  理论历元数：{result['expected_epochs']}\n")
             f.write(f"  随机种子：{s.random_seed}\n")
             f.write(f"  高度角阈值：{s.elevation_mask_deg}°\n")
 
             # 动态接收机说明
-            if s.enable_receiver_motion:
+            if s.enable_receiver_motion and s.trajectory_points:
+                f.write("  接收机运动模型：动态（ECEF 折线轨迹，按 time_offset_s 线性插值）\n")
+                f.write(
+                    f"    初始位置：X={s.receiver_initial_position[0]:.4f} m，"
+                    f"Y={s.receiver_initial_position[1]:.4f} m，"
+                    f"Z={s.receiver_initial_position[2]:.4f} m\n"
+                )
+                f.write("    轨迹点：(time_offset_s, dx, dy, dz)\n")
+                for point in s.trajectory_points:
+                    f.write(f"      {point}\n")
+            elif s.enable_receiver_motion:
                 f.write("  接收机运动模型：动态（ECEF 匀速直线运动）\n")
                 f.write(
                     f"    初始位置：X={s.receiver_initial_position[0]:.4f} m，"
@@ -469,6 +622,18 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
                     f"    速度：Vx={s.receiver_velocity_mps[0]:.4f} m/s，"
                     f"Vy={s.receiver_velocity_mps[1]:.4f} m/s，"
                     f"Vz={s.receiver_velocity_mps[2]:.4f} m/s\n"
+                )
+                f.write(
+                    "    6 小时总位移："
+                    f"dx={s.receiver_velocity_mps[0] * 21600:.3f} m，"
+                    f"dy={s.receiver_velocity_mps[1] * 21600:.3f} m，"
+                    f"dz={s.receiver_velocity_mps[2] * 21600:.3f} m\n"
+                )
+                f.write(
+                    "    相邻历元位移："
+                    f"dx={s.receiver_velocity_mps[0] * s.interval_seconds:.3f} m，"
+                    f"dy={s.receiver_velocity_mps[1] * s.interval_seconds:.3f} m，"
+                    f"dz={s.receiver_velocity_mps[2] * s.interval_seconds:.3f} m\n"
                 )
             else:
                 f.write("  接收机运动模型：静态\n")
@@ -483,6 +648,8 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
             f.write(f"  平均误差：{_format_float(summary.mean_error_3d, 3)} m\n")
             f.write(f"  RMS 误差：{_format_float(summary.rms_error_3d, 3)} m\n")
             f.write(f"  最大误差：{_format_float(summary.max_error_3d, 3)} m\n")
+            if result["failure_reason"]:
+                f.write(f"  failure_reason：{result['failure_reason']}\n")
             f.write(f"  输出目录：{result['output_dir']}\n\n")
 
         f.write("场景间结果对比\n")
@@ -493,7 +660,7 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
             for r in scenario_results
             if math.isfinite(r["summary"].mean_error_3d)
         ]
-        if len(set(success_rates)) == 1:
+        if len(success_rates) > 0 and len(set(success_rates)) == 1:
             f.write(f"所有场景成功率一致：{success_rates[0] * 100:.2f}%\n")
         else:
             f.write("不同场景成功率存在差异，说明参数设置对定位结果有影响。\n")
@@ -502,8 +669,11 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
                 f"平均误差范围：{min(mean_errors):.3f} m 至 {max(mean_errors):.3f} m\n"
             )
         f.write("\n系统测试结论：\n")
-        f.write("多场景测试已完成。系统在不同参数配置下均能正常输出定位结果，\n")
-        f.write("满足多场景测试要求。\n")
+        failed = [r for r in scenario_results if not r["succeeded"]]
+        if failed:
+            f.write("多场景测试已完成，部分场景失败，失败原因已在上方和 summary.csv 中记录。\n")
+        else:
+            f.write("多场景测试已完成。5 个场景均完成 6 小时连续定位输出，满足多场景测试要求。\n")
 
     return {
         "summary_csv": summary_csv_path,

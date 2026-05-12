@@ -1,7 +1,7 @@
 ﻿模块五：系统整合与测试报告
 ============================================
 项目名称：北斗定位解算全流程软件系统
-测试时间：2026-05-12 19:23:11
+测试时间：2026-05-12 20:04:54
 NAV 文件路径：nav\tarc0910.26b_cnav
 接收机运动模型：动态接收机（ECEF 匀速直线运动）
   初始真实坐标：X=-2267800.0000 m，Y=5009340.0000 m，Z=3221000.0000 m
@@ -44,21 +44,41 @@ NAV 文件路径：nav\tarc0910.26b_cnav
 输出文件列表：
   - outputs\basic\module5_multi_scenario_summary.csv
   - outputs\basic\module5_multi_scenario_test_report.txt
-  - outputs\basic\scenario_1_default\module4_continuous_position_results.csv
-  - outputs\basic\scenario_1_default\module4_error_statistics.txt
-  - outputs\basic\scenario_1_default\module4_error_curve.png
-  - outputs\basic\scenario_1_default\module4_trajectory.png
-  - outputs\basic\scenario_1_default\module4_satellite_dop_curve.png
-  - outputs\basic\scenario_2_different_seed\module4_continuous_position_results.csv
-  - outputs\basic\scenario_2_different_seed\module4_error_statistics.txt
-  - outputs\basic\scenario_2_different_seed\module4_error_curve.png
-  - outputs\basic\scenario_2_different_seed\module4_trajectory.png
-  - outputs\basic\scenario_2_different_seed\module4_satellite_dop_curve.png
-  - outputs\basic\scenario_3_elevation_mask\module4_continuous_position_results.csv
-  - outputs\basic\scenario_3_elevation_mask\module4_error_statistics.txt
-  - outputs\basic\scenario_3_elevation_mask\module4_error_curve.png
-  - outputs\basic\scenario_3_elevation_mask\module4_trajectory.png
-  - outputs\basic\scenario_3_elevation_mask\module4_satellite_dop_curve.png
+  - outputs\basic\scenario_1_static_beijing\module4_continuous_position_results.csv
+  - outputs\basic\scenario_1_static_beijing\module4_error_statistics.txt
+  - outputs\basic\scenario_1_static_beijing\module4_error_curve.png
+  - outputs\basic\scenario_1_static_beijing\module4_trajectory.png
+  - outputs\basic\scenario_1_static_beijing\module4_true_vs_estimated_trajectory.png
+  - outputs\basic\scenario_1_static_beijing\module4_satellite_dop_curve.png
+  - outputs\basic\scenario_1_static_beijing\module4_dop_error_analysis.png
+  - outputs\basic\scenario_2_static_shanghai\module4_continuous_position_results.csv
+  - outputs\basic\scenario_2_static_shanghai\module4_error_statistics.txt
+  - outputs\basic\scenario_2_static_shanghai\module4_error_curve.png
+  - outputs\basic\scenario_2_static_shanghai\module4_trajectory.png
+  - outputs\basic\scenario_2_static_shanghai\module4_true_vs_estimated_trajectory.png
+  - outputs\basic\scenario_2_static_shanghai\module4_satellite_dop_curve.png
+  - outputs\basic\scenario_2_static_shanghai\module4_dop_error_analysis.png
+  - outputs\basic\scenario_3_static_guangzhou\module4_continuous_position_results.csv
+  - outputs\basic\scenario_3_static_guangzhou\module4_error_statistics.txt
+  - outputs\basic\scenario_3_static_guangzhou\module4_error_curve.png
+  - outputs\basic\scenario_3_static_guangzhou\module4_trajectory.png
+  - outputs\basic\scenario_3_static_guangzhou\module4_true_vs_estimated_trajectory.png
+  - outputs\basic\scenario_3_static_guangzhou\module4_satellite_dop_curve.png
+  - outputs\basic\scenario_3_static_guangzhou\module4_dop_error_analysis.png
+  - outputs\basic\scenario_4_dynamic_linear_xian\module4_continuous_position_results.csv
+  - outputs\basic\scenario_4_dynamic_linear_xian\module4_error_statistics.txt
+  - outputs\basic\scenario_4_dynamic_linear_xian\module4_error_curve.png
+  - outputs\basic\scenario_4_dynamic_linear_xian\module4_trajectory.png
+  - outputs\basic\scenario_4_dynamic_linear_xian\module4_true_vs_estimated_trajectory.png
+  - outputs\basic\scenario_4_dynamic_linear_xian\module4_satellite_dop_curve.png
+  - outputs\basic\scenario_4_dynamic_linear_xian\module4_dop_error_analysis.png
+  - outputs\basic\scenario_5_dynamic_polyline_chengdu\module4_continuous_position_results.csv
+  - outputs\basic\scenario_5_dynamic_polyline_chengdu\module4_error_statistics.txt
+  - outputs\basic\scenario_5_dynamic_polyline_chengdu\module4_error_curve.png
+  - outputs\basic\scenario_5_dynamic_polyline_chengdu\module4_trajectory.png
+  - outputs\basic\scenario_5_dynamic_polyline_chengdu\module4_true_vs_estimated_trajectory.png
+  - outputs\basic\scenario_5_dynamic_polyline_chengdu\module4_satellite_dop_curve.png
+  - outputs\basic\scenario_5_dynamic_polyline_chengdu\module4_dop_error_analysis.png
 
 连续定位总体统计结果：
   总历元数：13
