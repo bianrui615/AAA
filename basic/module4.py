@@ -514,3 +514,49 @@ def plot_results(
     fig.tight_layout()
     plt.savefig(output_path / "module4_satellite_dop_curve.png", dpi=160)
     plt.close(fig)
+
+
+if __name__ == "__main__":
+    # 命令行入口：直接运行 module4.py 即可执行连续定位仿真
+    from basic.module1 import parse_nav_file
+
+    # 默认参数（与 module5 保持一致）
+    _nav_path = "nav/tarc0910.26b_cnav"
+    _receiver_position: ECEF = (-2267800.0, 5009340.0, 3221000.0)
+    _start_time = datetime(2026, 4, 1, 0, 0, 0)
+    _end_time = datetime(2026, 4, 1, 1, 0, 0)
+    _interval = 300
+    _output_dir = "outputs/basic"
+
+    print(f"[module4] 正在解析 NAV 文件: {_nav_path}")
+    nav_data, parse_info = parse_nav_file(_nav_path)
+    sat_count = len(nav_data)
+    eph_count = sum(len(v) for v in nav_data.values())
+    print(f"[module4] 解析完成: RINEX {parse_info.rinex_version}, {sat_count} 颗卫星, {eph_count} 条星历")
+
+    print(f"[module4] 开始连续定位解算 ({_start_time} ~ {_end_time}, 间隔 {_interval}s)")
+    results, summary = run_continuous_positioning(
+        nav_data=nav_data,
+        start_time=_start_time,
+        end_time=_end_time,
+        interval_seconds=_interval,
+        receiver_true_position=_receiver_position,
+        output_dir=_output_dir,
+    )
+
+    print(f"[module4] 解算完成!")
+    print(f"  - 总历元数: {summary.total_epochs}")
+    print(f"  - 成功历元: {summary.success_epochs}")
+    print(f"  - 失败历元: {summary.failed_epochs}")
+    print(f"  - 成功率: {summary.success_rate * 100:.2f}%")
+    print(f"  - RMS 三维误差: {summary.rms_error_3d:.6f} m")
+    print(f"  - 平均 PDOP: {summary.average_pdop:.6f}")
+    print(f"  - 输出目录: {_output_dir}/")
+    print(f"  - 输出文件:")
+    print(f"      module4_continuous_position_results.csv")
+    print(f"      module4_error_statistics.txt")
+    print(f"      module4_error_curve.png")
+    print(f"      module4_trajectory.png")
+    print(f"      module4_satellite_dop_curve.png")
+    if Path(_output_dir).exists() and any(Path(_output_dir).glob("module4_true_vs_estimated_trajectory.png")):
+        print(f"      module4_true_vs_estimated_trajectory.png")

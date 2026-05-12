@@ -10,6 +10,13 @@ module3.py
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+# 确保项目根目录在 sys.path 中，支持直接运行和作为模块导入
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from dataclasses import dataclass
 from datetime import datetime
 import csv
@@ -23,7 +30,10 @@ import numpy as np
 from basic.module1 import (
     compute_elevation as satellite_elevation_deg,
     compute_geometric_range as geometric_distance,
+    compute_satellite_position,
     ecef_to_blh,
+    parse_nav_file,
+    select_ephemeris,
 )
 
 
@@ -579,4 +589,87 @@ def save_single_epoch_spp_outputs(
 
 
 if __name__ == "__main__":
-    print("请运行 basic/module5.py，以使用 NAV 星历执行模块三测试。")
+    # 模块三独立运行：生成单历元模拟伪距并进行 SPP 解算，输出 CSV 与 TXT
+    NAV_FILE_PATH = "nav/tarc0910.26b_cnav"
+    RECEIVER_TRUE_POSITION: ECEF = (-2267800.0, 5009340.0, 3221000.0)
+    TEST_EPOCH_TIME = datetime(2026, 4, 1, 0, 0, 0)
+    RANDOM_SEED = 2026
+    MAX_ITERATIONS = 12
+    CONVERGENCE_THRESHOLD = 1e-4
+    ELEVATION_MASK_DEG = 0.0
+    OUTPUT_DIR = "outputs/basic"
+
+    try:
+        nav_data, parse_info = parse_nav_file(NAV_FILE_PATH)
+        sat_count = len(nav_data)
+        eph_count = sum(len(records) for records in nav_data.values())
+        print(f"NAV 解析完成：北斗卫星 {sat_count} 颗，星历记录 {eph_count} 条")
+
+        # 计算卫星位置
+        satellite_positions: Dict[str, ECEF] = {}
+        satellite_health: Dict[str, float] = {}
+        for sat_id in sorted(nav_data):
+            eph = select_ephemeris(nav_data, sat_id, TEST_EPOCH_TIME, healthy_only=True)
+            if eph is None:
+                continue
+            try:
+                x, y, z = compute_satellite_position(eph, TEST_EPOCH_TIME)
+                satellite_positions[sat_id] = (x, y, z)
+                satellite_health[sat_id] = float(eph.health)
+            except Exception:
+                continue
+
+        print(f"可用卫星位置：{len(satellite_positions)} 颗")
+        if len(satellite_positions) < 4:
+            raise ValueError("可用卫星少于 4 颗，无法解算")
+
+        # 生成模拟伪距
+        pseudo_records = generate_simulated_pseudorange_records(
+            satellite_positions,
+            RECEIVER_TRUE_POSITION,
+            TEST_EPOCH_TIME,
+            seed=RANDOM_SEED,
+            satellite_health=satellite_health,
+        )
+        pseudoranges = pseudorange_records_to_dict(pseudo_records)
+        print(f"模拟伪距已生成：{len(pseudo_records)} 条记录")
+
+        # SPP 解算
+        solution = solve_spp(
+            satellite_positions,
+            pseudoranges,
+            initial_position=RECEIVER_TRUE_POSITION,
+            max_iter=MAX_ITERATIONS,
+            convergence_threshold=CONVERGENCE_THRESHOLD,
+            satellite_health=satellite_health,
+            elevation_mask_deg=ELEVATION_MASK_DEG,
+            enable_pseudorange_outlier_filter=False,
+        )
+
+        if solution.converged:
+            error_3d = geometric_distance(
+                (solution.x, solution.y, solution.z),
+                RECEIVER_TRUE_POSITION,
+            )
+            print(
+                f"SPP 解算成功：X={solution.x:.4f}, Y={solution.y:.4f}, Z={solution.z:.4f}, "
+                f"误差={error_3d:.4f} m, 迭代={solution.iterations}"
+            )
+        else:
+            print(f"SPP 解算未收敛：{solution.message}")
+
+        # 保存输出
+        output_paths = save_single_epoch_spp_outputs(
+            pseudo_records,
+            solution,
+            OUTPUT_DIR,
+            TEST_EPOCH_TIME,
+            RECEIVER_TRUE_POSITION,
+            elevation_mask_deg=ELEVATION_MASK_DEG,
+        )
+        print(f"模块三输出已保存：")
+        for key, path in output_paths.items():
+            print(f"  {key}: {path}")
+    except Exception as exc:
+        print(f"模块三独立运行失败：{exc}")
+        raise

@@ -26,7 +26,7 @@
   - 支持 `--seed`，保证可复现。
   - 预处理明确输出健康筛选、高度角筛选、粗差筛选、历元对齐后的卫星数量。
 - 模块 2：
-  - 输出 `satellite_debug.csv` 和 `corrected_pseudorange.csv`。
+  - 输出 `module2_satellite_debug.csv` 和 `corrected_pseudorange.csv`。
   - 将 Saastamoinen 对流层、简化电离层、卫星钟差修正集中到 `corrections.py`。
   - 在关键公式旁补充变量含义、单位注释。
 - 模块 3：
