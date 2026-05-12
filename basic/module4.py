@@ -81,6 +81,23 @@ class AnalysisSummary:
     elevation_mask_deg: float = 0.0
 
 
+def build_linear_receiver_trajectory(start_time: datetime, initial_position: ECEF, velocity_mps: ECEF):
+    """构建 ECEF 匀速直线运动轨迹函数。
+
+    返回一个可调用对象 trajectory(epoch_time) -> ECEF。
+    """
+
+    def trajectory(epoch_time: datetime) -> ECEF:
+        dt = (epoch_time - start_time).total_seconds()
+        return (
+            initial_position[0] + velocity_mps[0] * dt,
+            initial_position[1] + velocity_mps[1] * dt,
+            initial_position[2] + velocity_mps[2] * dt,
+        )
+
+    return trajectory
+
+
 def _time_range(start_time: datetime, end_time: datetime, interval_seconds: int):
     """生成闭区间历元序列。"""
 
@@ -142,6 +159,8 @@ def run_continuous_positioning(
     convergence_threshold: float = 1e-4,
     elevation_mask_deg: float = 0.0,
     progress_callback: Optional[Callable[[dict, int, int], None]] = None,
+    receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None,
+    receiver_initial_approx: Optional[ECEF] = None,
 ) -> Tuple[List[dict], AnalysisSummary]:
     """执行连续定位仿真，并保存模块四全部输出。"""
 
@@ -159,8 +178,16 @@ def run_continuous_positioning(
     total_epochs = int((end_time - start_time).total_seconds() // interval_seconds) + 1
 
     for epoch_time in _time_range(start_time, end_time, interval_seconds):
+        # 确定当前历元真实接收机位置
+        if receiver_trajectory is not None:
+            true_position_epoch = receiver_trajectory(epoch_time)
+        else:
+            true_position_epoch = receiver_true_position
+
         satellite_positions = _collect_satellite_positions(nav_data, epoch_time)
         satellite_count = len(satellite_positions)
+
+        true_lat, true_lon, true_height = ecef_to_blh(*true_position_epoch)
 
         if satellite_count < 4:
             results.append(
@@ -168,6 +195,13 @@ def run_continuous_positioning(
                     "epoch_time": epoch_time.isoformat(sep=" "),
                     "status": "失败",
                     "satellite_count": satellite_count,
+                    "raw_satellite_count": satellite_count,
+                    "true_X": true_position_epoch[0],
+                    "true_Y": true_position_epoch[1],
+                    "true_Z": true_position_epoch[2],
+                    "true_lat": true_lat,
+                    "true_lon": true_lon,
+                    "true_height": true_height,
                     "X": math.nan,
                     "Y": math.nan,
                     "Z": math.nan,
@@ -179,6 +213,7 @@ def run_continuous_positioning(
                     "GDOP": math.nan,
                     "error_3d": math.nan,
                     "iteration_count": 0,
+                    "rejected_outliers": 0,
                     "failure_reason": "可用卫星数量少于 4 颗",
                     "elevation_mask_deg": elevation_mask_deg,
                 }
@@ -189,15 +224,24 @@ def run_continuous_positioning(
 
         pseudo_records = generate_simulated_pseudorange_records(
             satellite_positions,
-            receiver_true_position,
+            true_position_epoch,
             epoch_time,
             rng=rng,
         )
         pseudoranges = pseudorange_records_to_dict(pseudo_records)
+
+        # SPP 初始值逻辑
+        if previous_solution is not None:
+            initial_position = previous_solution
+        elif receiver_initial_approx is not None:
+            initial_position = receiver_initial_approx
+        else:
+            initial_position = true_position_epoch
+
         solution = solve_spp(
             satellite_positions,
             pseudoranges,
-            initial_position=previous_solution if previous_solution is not None else receiver_true_position,
+            initial_position=initial_position,
             initial_clock_bias=0.0,
             max_iter=max_iter,
             convergence_threshold=convergence_threshold,
@@ -207,7 +251,7 @@ def run_continuous_positioning(
 
         if solution.converged:
             previous_solution = (solution.x, solution.y, solution.z)
-            error_3d = compute_geometric_range(previous_solution, receiver_true_position)
+            error_3d = compute_geometric_range(previous_solution, true_position_epoch)
             status = "成功"
             failure_reason = ""
         else:
@@ -221,6 +265,12 @@ def run_continuous_positioning(
                 "status": status,
                 "satellite_count": solution.satellite_count,
                 "raw_satellite_count": satellite_count,
+                "true_X": true_position_epoch[0],
+                "true_Y": true_position_epoch[1],
+                "true_Z": true_position_epoch[2],
+                "true_lat": true_lat,
+                "true_lon": true_lon,
+                "true_height": true_height,
                 "X": solution.x,
                 "Y": solution.y,
                 "Z": solution.z,
@@ -243,7 +293,7 @@ def run_continuous_positioning(
     save_results_to_csv(results, output_path / "module4_continuous_position_results.csv")
     summary = calculate_summary(results)
     save_error_statistics(summary, output_path / "module4_error_statistics.txt")
-    plot_results(results, output_path, receiver_true_position)
+    plot_results(results, output_path)
     return results, summary
 
 
@@ -255,6 +305,12 @@ def save_results_to_csv(results: List[dict], csv_path: str | Path) -> None:
         "status",
         "satellite_count",
         "raw_satellite_count",
+        "true_X",
+        "true_Y",
+        "true_Z",
+        "true_lat",
+        "true_lon",
+        "true_height",
         "X",
         "Y",
         "Z",
@@ -347,7 +403,6 @@ def save_error_statistics(summary: AnalysisSummary, txt_path: str | Path) -> Non
 def plot_results(
     results: List[dict],
     output_dir: str | Path,
-    receiver_true_position: ECEF,
 ) -> None:
     """绘制误差曲线、经纬度轨迹、卫星数量与 DOP 曲线。"""
 
@@ -393,10 +448,25 @@ def plot_results(
     plt.savefig(output_path / "module4_error_curve.png", dpi=160)
     plt.close()
 
-    true_lat, true_lon, _ = ecef_to_blh(*receiver_true_position)
+    # 经纬度轨迹图：支持真实轨迹与解算轨迹
+    has_true_coords = all(
+        math.isfinite(float(row.get("true_lat", math.nan))) and math.isfinite(float(row.get("true_lon", math.nan)))
+        for row in results
+    )
+
     plt.figure(figsize=(6, 6))
     plt.plot(lons, lats, marker="o", linewidth=1.2, label="解算轨迹")
-    plt.scatter([true_lon], [true_lat], marker="*", s=130, label="真实接收机位置")
+
+    if has_true_coords:
+        true_lats = [float(row["true_lat"]) for row in results]
+        true_lons = [float(row["true_lon"]) for row in results]
+        plt.plot(true_lons, true_lats, marker="s", linewidth=1.2, linestyle="--", label="真实轨迹")
+        plt.scatter([true_lons[0]], [true_lats[0]], marker="*", s=130, color="green", label="真实轨迹起点")
+        plt.scatter([true_lons[-1]], [true_lats[-1]], marker="X", s=130, color="red", label="真实轨迹终点")
+    else:
+        # 兼容旧数据：如果缺少 true_lat/true_lon，则只显示解算轨迹
+        pass
+
     plt.xlabel("经度 (deg)")
     plt.ylabel("纬度 (deg)")
     plt.title("模块四：经纬度轨迹图")
@@ -405,6 +475,24 @@ def plot_results(
     plt.tight_layout()
     plt.savefig(output_path / "module4_trajectory.png", dpi=160)
     plt.close()
+
+    # 额外输出真实轨迹 vs 解算轨迹对比图（动态模式下更有意义）
+    if has_true_coords:
+        true_lats = [float(row["true_lat"]) for row in results]
+        true_lons = [float(row["true_lon"]) for row in results]
+        plt.figure(figsize=(6, 6))
+        plt.plot(true_lons, true_lats, marker="s", linewidth=1.5, linestyle="--", label="真实轨迹")
+        plt.plot(lons, lats, marker="o", linewidth=1.2, label="SPP 解算轨迹")
+        plt.scatter([true_lons[0]], [true_lats[0]], marker="*", s=130, color="green", label="真实轨迹起点")
+        plt.scatter([true_lons[-1]], [true_lats[-1]], marker="X", s=130, color="red", label="真实轨迹终点")
+        plt.xlabel("经度 (deg)")
+        plt.ylabel("纬度 (deg)")
+        plt.title("模块四：真实轨迹与 SPP 解算轨迹对比")
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(output_path / "module4_true_vs_estimated_trajectory.png", dpi=160)
+        plt.close()
 
     fig, ax1 = plt.subplots(figsize=(10, 5))
     ax1.plot(x_axis, counts, color="tab:blue", marker="o", label="卫星数量")

@@ -6,8 +6,9 @@ rinex_gui.py
 功能：
 - 导入 RINEX NAV 导航文件；
 - 设置连续定位起止时间、采样间隔、最大迭代次数和收敛阈值；
+- 支持静态/动态接收机轨迹输入（匀速直线、表格折线、CSV 文件）；
 - 后台线程逐历元解算并实时刷新表格、统计信息和图表；
-- 支持定位轨迹回放和误差曲线查看。
+- 支持定位轨迹回放、轨迹预览和误差曲线查看。
 """
 
 from __future__ import annotations
@@ -23,8 +24,8 @@ import csv
 import math
 import os
 import shutil
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path("outputs/basic") / "matplotlib_cache"))
 
@@ -33,6 +34,7 @@ try:
     from PyQt5.QtWidgets import (
         QApplication,
         QAbstractItemView,
+        QComboBox,
         QDateTimeEdit,
         QDoubleSpinBox,
         QFileDialog,
@@ -40,6 +42,7 @@ try:
         QGridLayout,
         QGroupBox,
         QHBoxLayout,
+        QHeaderView,
         QLabel,
         QLineEdit,
         QMainWindow,
@@ -49,6 +52,7 @@ try:
         QSlider,
         QSpinBox,
         QSplitter,
+        QStackedWidget,
         QTableWidget,
         QTableWidgetItem,
         QTabWidget,
@@ -74,6 +78,7 @@ if QT_IMPORT_ERROR is None:
     from basic.module3 import ECEF
     from basic.module4 import (
         AnalysisSummary,
+        build_linear_receiver_trajectory,
         calculate_summary,
         plot_results,
         run_continuous_positioning,
@@ -141,6 +146,130 @@ def _blh_to_ecef(lat_deg: float, lon_deg: float, height: float) -> ECEF:
     return x, y, z
 
 
+def _interpolate_trajectory_point(
+    points: List[Tuple[float, float, float, float]], dt: float
+) -> Tuple[float, float, float]:
+    """对轨迹点列表按 time_offset_s 做线性插值。
+
+    points: [(time_offset_s, dx, dy, dz), ...]，已按 time_offset_s 递增排序。
+    返回 (dx, dy, dz)。
+    """
+    if not points:
+        return 0.0, 0.0, 0.0
+    if dt <= points[0][0]:
+        return points[0][1], points[0][2], points[0][3]
+    if dt >= points[-1][0]:
+        return points[-1][1], points[-1][2], points[-1][3]
+    for i in range(len(points) - 1):
+        t0, x0, y0, z0 = points[i]
+        t1, x1, y1, z1 = points[i + 1]
+        if t0 <= dt <= t1:
+            if abs(t1 - t0) < 1e-12:
+                return x0, y0, z0
+            ratio = (dt - t0) / (t1 - t0)
+            return (
+                x0 + ratio * (x1 - x0),
+                y0 + ratio * (y1 - y0),
+                z0 + ratio * (z1 - z0),
+            )
+    return points[-1][1], points[-1][2], points[-1][3]
+
+
+def _load_trajectory_csv(
+    csv_path: str,
+    initial_position: ECEF,
+    start_time: datetime,
+) -> Tuple[Optional[Callable[[datetime], ECEF]], str]:
+    """加载轨迹 CSV 文件，返回 (trajectory_func, message)。
+
+    支持格式 A：time_offset_s,dx,dy,dz
+    支持格式 B：epoch,true_X,true_Y,true_Z
+    """
+    try:
+        with Path(csv_path).open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        if not rows:
+            return None, "CSV 文件为空"
+
+        headers = [h.strip().lower() for h in rows[0].keys()]
+
+        # 检测格式 B
+        if "true_x" in headers and "true_y" in headers and "true_z" in headers:
+            # 格式 B：epoch,true_X,true_Y,true_Z
+            # 尝试解析 epoch 列
+            epochs_and_positions: List[Tuple[datetime, ECEF]] = []
+            for row in rows:
+                epoch_val = row.get("epoch", "").strip()
+                if not epoch_val:
+                    continue
+                try:
+                    # 尝试 ISO 格式
+                    epoch_dt = datetime.fromisoformat(epoch_val.replace(" ", "T").replace("Z", "+00:00"))
+                except ValueError:
+                    # 尝试自定义格式
+                    try:
+                        epoch_dt = datetime.strptime(epoch_val, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        continue
+                tx = float(row["true_X"])
+                ty = float(row["true_Y"])
+                tz = float(row["true_Z"])
+                epochs_and_positions.append((epoch_dt, (tx, ty, tz)))
+            if not epochs_and_positions:
+                return None, "未能解析格式 B 中的任何有效历元"
+            epochs_and_positions.sort(key=lambda x: x[0])
+
+            def traj_b(epoch_time: datetime) -> ECEF:
+                if epoch_time <= epochs_and_positions[0][0]:
+                    return epochs_and_positions[0][1]
+                if epoch_time >= epochs_and_positions[-1][0]:
+                    return epochs_and_positions[-1][1]
+                for i in range(len(epochs_and_positions) - 1):
+                    t0, p0 = epochs_and_positions[i]
+                    t1, p1 = epochs_and_positions[i + 1]
+                    if t0 <= epoch_time <= t1:
+                        dt_total = (t1 - t0).total_seconds()
+                        if dt_total <= 0:
+                            return p0
+                        dt = (epoch_time - t0).total_seconds()
+                        ratio = dt / dt_total
+                        return (
+                            p0[0] + ratio * (p1[0] - p0[0]),
+                            p0[1] + ratio * (p1[1] - p0[1]),
+                            p0[2] + ratio * (p1[2] - p0[2]),
+                        )
+                return epochs_and_positions[-1][1]
+
+            return traj_b, f"格式 B：已加载 {len(epochs_and_positions)} 个历元点"
+
+        # 检测格式 A
+        if "time_offset_s" in headers:
+            points: List[Tuple[float, float, float, float]] = []
+            for row in rows:
+                t = float(row["time_offset_s"])
+                dx = float(row.get("dx", 0.0))
+                dy = float(row.get("dy", 0.0))
+                dz = float(row.get("dz", 0.0))
+                points.append((t, dx, dy, dz))
+            points.sort(key=lambda x: x[0])
+
+            def traj_a(epoch_time: datetime) -> ECEF:
+                dt = (epoch_time - start_time).total_seconds()
+                odx, ody, odz = _interpolate_trajectory_point(points, dt)
+                return (
+                    initial_position[0] + odx,
+                    initial_position[1] + ody,
+                    initial_position[2] + odz,
+                )
+
+            return traj_a, f"格式 A：已加载 {len(points)} 个轨迹点"
+
+        return None, "未能识别 CSV 格式（需要 time_offset_s,dx,dy,dz 或 epoch,true_X,true_Y,true_Z）"
+    except Exception as exc:
+        return None, f"加载 CSV 失败：{exc}"
+
+
 if QT_IMPORT_ERROR is None:
 
     class PositioningWorker(QThread):
@@ -161,6 +290,11 @@ if QT_IMPORT_ERROR is None:
             max_iter: int,
             convergence_threshold: float,
             elevation_mask_deg: float = 0.0,
+            trajectory_mode: str = "静态接收机",
+            velocity_mps: Optional[Tuple[float, float, float]] = None,
+            trajectory_points: Optional[List[Tuple[float, float, float, float]]] = None,
+            trajectory_csv_path: Optional[str] = None,
+            receiver_initial_approx: Optional[ECEF] = None,
         ) -> None:
             super().__init__()
             self.nav_data = nav_data
@@ -173,10 +307,51 @@ if QT_IMPORT_ERROR is None:
             self.max_iter = max_iter
             self.convergence_threshold = convergence_threshold
             self.elevation_mask_deg = elevation_mask_deg
+            self.trajectory_mode = trajectory_mode
+            self.velocity_mps = velocity_mps
+            self.trajectory_points = trajectory_points
+            self.trajectory_csv_path = trajectory_csv_path
+            self.receiver_initial_approx = receiver_initial_approx
 
         def run(self) -> None:
             try:
                 self.log_message.emit("开始连续定位解算...")
+
+                receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None
+
+                if self.trajectory_mode == "匀速直线运动" and self.velocity_mps is not None:
+                    receiver_trajectory = build_linear_receiver_trajectory(
+                        self.start_time,
+                        self.receiver_true_position,
+                        self.velocity_mps,
+                    )
+                    self.log_message.emit(
+                        f"动态轨迹：匀速直线运动，V=({self.velocity_mps[0]}, {self.velocity_mps[1]}, {self.velocity_mps[2]}) m/s"
+                    )
+                elif self.trajectory_mode == "表格折线轨迹" and self.trajectory_points:
+                    x0, y0, z0 = self.receiver_true_position
+                    points = list(self.trajectory_points)
+
+                    def table_traj(epoch_time: datetime) -> ECEF:
+                        dt = (epoch_time - self.start_time).total_seconds()
+                        dx, dy, dz = _interpolate_trajectory_point(points, dt)
+                        return (x0 + dx, y0 + dy, z0 + dz)
+
+                    receiver_trajectory = table_traj
+                    self.log_message.emit(f"动态轨迹：表格折线轨迹，共 {len(points)} 个控制点")
+                elif self.trajectory_mode == "CSV轨迹文件" and self.trajectory_csv_path:
+                    traj_func, msg = _load_trajectory_csv(
+                        self.trajectory_csv_path,
+                        self.receiver_true_position,
+                        self.start_time,
+                    )
+                    if traj_func is None:
+                        self.failed.emit(msg)
+                        return
+                    receiver_trajectory = traj_func
+                    self.log_message.emit(f"动态轨迹：{msg}")
+                else:
+                    self.log_message.emit("静态接收机模式")
 
                 def on_progress(row: dict, index: int, total: int) -> None:
                     self.progress_row.emit(row, index, total)
@@ -193,6 +368,8 @@ if QT_IMPORT_ERROR is None:
                     convergence_threshold=self.convergence_threshold,
                     elevation_mask_deg=self.elevation_mask_deg,
                     progress_callback=on_progress,
+                    receiver_trajectory=receiver_trajectory,
+                    receiver_initial_approx=self.receiver_initial_approx,
                 )
                 self.finished_ok.emit(results, summary)
             except Exception as exc:
@@ -210,11 +387,14 @@ if QT_IMPORT_ERROR is None:
             "历元时间",
             "状态",
             "卫星数",
-            "X(m)",
-            "Y(m)",
-            "Z(m)",
-            "纬度(deg)",
-            "经度(deg)",
+            "真值X",
+            "真值Y",
+            "真值Z",
+            "解算X",
+            "解算Y",
+            "解算Z",
+            "纬度",
+            "经度",
             "误差(m)",
             "迭代",
         ]
@@ -222,7 +402,7 @@ if QT_IMPORT_ERROR is None:
         def __init__(self) -> None:
             super().__init__()
             self.setWindowTitle(f"北斗 RINEX 连续定位可视化 - {QT_BINDING}")
-            self.resize(1280, 820)
+            self.resize(1400, 900)
 
             self.nav_data: Optional[Dict[str, List[Any]]] = None
             self.results: List[dict] = []
@@ -251,8 +431,8 @@ if QT_IMPORT_ERROR is None:
 
         def _build_control_panel(self) -> QWidget:
             panel = QWidget()
-            panel.setMinimumWidth(330)
-            panel.setMaximumWidth(410)
+            panel.setMinimumWidth(340)
+            panel.setMaximumWidth(440)
             layout = QVBoxLayout(panel)
 
             file_group = QGroupBox("RINEX 数据导入")
@@ -350,6 +530,10 @@ if QT_IMPORT_ERROR is None:
             receiver_layout.addWidget(self.receiver_tabs)
             layout.addWidget(receiver_group)
 
+            # 接收机轨迹设置
+            trajectory_group = self._build_trajectory_group()
+            layout.addWidget(trajectory_group)
+
             action_layout = QHBoxLayout()
             self.run_button = QPushButton("开始解算")
             self.run_button.clicked.connect(self.start_positioning)
@@ -371,6 +555,108 @@ if QT_IMPORT_ERROR is None:
             layout.addWidget(self.log_box)
             layout.addStretch(1)
             return panel
+
+        def _build_trajectory_group(self) -> QGroupBox:
+            group = QGroupBox("接收机轨迹设置")
+            layout = QVBoxLayout(group)
+
+            self.trajectory_mode_combo = QComboBox()
+            self.trajectory_mode_combo.addItems([
+                "静态接收机",
+                "匀速直线运动",
+                "表格折线轨迹",
+                "CSV轨迹文件",
+            ])
+            self.trajectory_mode_combo.currentTextChanged.connect(self._on_trajectory_mode_changed)
+            layout.addWidget(QLabel("轨迹模式"))
+            layout.addWidget(self.trajectory_mode_combo)
+
+            self.trajectory_stack = QStackedWidget()
+
+            # Page 0: 静态（空占位）
+            static_page = QWidget()
+            static_layout = QVBoxLayout(static_page)
+            static_layout.addWidget(QLabel("静态模式：接收机真实位置不随时间变化。"))
+            static_layout.addStretch(1)
+            self.trajectory_stack.addWidget(static_page)
+
+            # Page 1: 匀速直线运动
+            linear_page = QWidget()
+            linear_layout = QGridLayout(linear_page)
+            self.velocity_x_spin = self._velocity_spin()
+            self.velocity_y_spin = self._velocity_spin()
+            self.velocity_z_spin = self._velocity_spin()
+            linear_layout.addWidget(QLabel("Vx(m/s)"), 0, 0)
+            linear_layout.addWidget(self.velocity_x_spin, 0, 1)
+            linear_layout.addWidget(QLabel("Vy(m/s)"), 1, 0)
+            linear_layout.addWidget(self.velocity_y_spin, 1, 1)
+            linear_layout.addWidget(QLabel("Vz(m/s)"), 2, 0)
+            linear_layout.addWidget(self.velocity_z_spin, 2, 1)
+            self.trajectory_stack.addWidget(linear_page)
+
+            # Page 2: 表格折线轨迹
+            table_page = QWidget()
+            table_layout = QVBoxLayout(table_page)
+            self.trajectory_table = QTableWidget(2, 4)
+            self.trajectory_table.setHorizontalHeaderLabels(["time_offset_s", "dx", "dy", "dz"])
+            self.trajectory_table.horizontalHeader().setStretchLastSection(True)
+            self.trajectory_table.setItem(0, 0, QTableWidgetItem("0"))
+            self.trajectory_table.setItem(0, 1, QTableWidgetItem("0"))
+            self.trajectory_table.setItem(0, 2, QTableWidgetItem("0"))
+            self.trajectory_table.setItem(0, 3, QTableWidgetItem("0"))
+            self.trajectory_table.setItem(1, 0, QTableWidgetItem("300"))
+            self.trajectory_table.setItem(1, 1, QTableWidgetItem("100"))
+            self.trajectory_table.setItem(1, 2, QTableWidgetItem("50"))
+            self.trajectory_table.setItem(1, 3, QTableWidgetItem("20"))
+            table_layout.addWidget(QLabel("轨迹控制点（time_offset_s 必须递增）："))
+            table_layout.addWidget(self.trajectory_table)
+            add_row_btn = QPushButton("添加一行")
+            add_row_btn.clicked.connect(self._add_trajectory_table_row)
+            table_layout.addWidget(add_row_btn)
+            self.trajectory_stack.addWidget(table_page)
+
+            # Page 3: CSV轨迹文件
+            csv_page = QWidget()
+            csv_layout = QVBoxLayout(csv_page)
+            self.csv_path_edit = QLineEdit()
+            self.csv_path_edit.setReadOnly(True)
+            self.csv_path_edit.setPlaceholderText("未选择 CSV 文件")
+            csv_btn = QPushButton("导入轨迹CSV")
+            csv_btn.clicked.connect(self.import_trajectory_csv)
+            csv_layout.addWidget(QLabel("支持格式 A：time_offset_s,dx,dy,dz\n支持格式 B：epoch,true_X,true_Y,true_Z"))
+            csv_layout.addWidget(self.csv_path_edit)
+            csv_layout.addWidget(csv_btn)
+            csv_layout.addStretch(1)
+            self.trajectory_stack.addWidget(csv_page)
+
+            layout.addWidget(self.trajectory_stack)
+
+            preview_btn = QPushButton("预览轨迹")
+            preview_btn.clicked.connect(self.preview_trajectory)
+            layout.addWidget(preview_btn)
+            return group
+
+        def _add_trajectory_table_row(self) -> None:
+            row = self.trajectory_table.rowCount()
+            self.trajectory_table.insertRow(row)
+            for col in range(4):
+                self.trajectory_table.setItem(row, col, QTableWidgetItem("0"))
+
+        def _velocity_spin(self) -> QDoubleSpinBox:
+            spin = QDoubleSpinBox()
+            spin.setRange(-10000.0, 10000.0)
+            spin.setDecimals(4)
+            spin.setSingleStep(0.1)
+            return spin
+
+        def _on_trajectory_mode_changed(self, mode: str) -> None:
+            index_map = {
+                "静态接收机": 0,
+                "匀速直线运动": 1,
+                "表格折线轨迹": 2,
+                "CSV轨迹文件": 3,
+            }
+            self.trajectory_stack.setCurrentIndex(index_map.get(mode, 0))
 
         def _build_workspace(self) -> QWidget:
             workspace = QWidget()
@@ -403,6 +689,7 @@ if QT_IMPORT_ERROR is None:
             self.tabs = QTabWidget()
             self.tabs.addTab(self._build_result_tab(), "实时结果")
             self.tabs.addTab(self._build_trajectory_tab(), "轨迹回放")
+            self.tabs.addTab(self._build_preview_tab(), "轨迹预览")
             self.tabs.addTab(self._build_error_tab(), "误差曲线")
             layout.addWidget(self.tabs, 1)
             return workspace
@@ -416,6 +703,7 @@ if QT_IMPORT_ERROR is None:
             self.result_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.result_table.verticalHeader().setVisible(False)
             self.result_table.horizontalHeader().setStretchLastSection(True)
+            self.result_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
             layout.addWidget(self.result_table)
             return tab
 
@@ -441,6 +729,16 @@ if QT_IMPORT_ERROR is None:
             controls.addWidget(QLabel("间隔"))
             controls.addWidget(self.play_speed_spin)
             layout.addLayout(controls)
+            return tab
+
+        def _build_preview_tab(self) -> QWidget:
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
+            self.preview_canvas = MplCanvas(width=6, height=5)
+            layout.addWidget(self.preview_canvas, 1)
+            hint = QLabel("点击左侧‘预览轨迹’按钮，可在此查看真实轨迹预览。")
+            hint.setStyleSheet("color: #888;")
+            layout.addWidget(hint)
             return tab
 
         def _build_error_tab(self) -> QWidget:
@@ -489,6 +787,10 @@ if QT_IMPORT_ERROR is None:
             self.receiver_lon_spin.setValue(lon)
             self.receiver_height_spin.setValue(height)
             self._update_blh_preview()
+            # 默认速度
+            self.velocity_x_spin.setValue(0.5)
+            self.velocity_y_spin.setValue(0.2)
+            self.velocity_z_spin.setValue(0.1)
             self.log(f"界面已启动。默认文件：{nav_path}")
             if nav_path.exists():
                 self.import_nav_file(nav_path)
@@ -575,6 +877,152 @@ if QT_IMPORT_ERROR is None:
                 QMessageBox.critical(self, "导入失败", str(exc))
                 self.log(f"导入失败：{exc}")
 
+        def import_trajectory_csv(self) -> None:
+            file_name, _ = QFileDialog.getOpenFileName(
+                self,
+                "导入轨迹 CSV",
+                str(Path.cwd()),
+                "CSV 文件 (*.csv)",
+            )
+            if not file_name:
+                return
+            self.csv_path_edit.setText(file_name)
+            self.log(f"已选择轨迹 CSV：{file_name}")
+
+        def _get_trajectory_table_points(self) -> List[Tuple[float, float, float, float]]:
+            points: List[Tuple[float, float, float, float]] = []
+            for row in range(self.trajectory_table.rowCount()):
+                try:
+                    t = float(self.trajectory_table.item(row, 0).text())
+                    dx = float(self.trajectory_table.item(row, 1).text())
+                    dy = float(self.trajectory_table.item(row, 2).text())
+                    dz = float(self.trajectory_table.item(row, 3).text())
+                    points.append((t, dx, dy, dz))
+                except (AttributeError, ValueError):
+                    continue
+            points.sort(key=lambda x: x[0])
+            return points
+
+        def _validate_trajectory_params(self, mode: str) -> Tuple[bool, str]:
+            if mode == "静态接收机":
+                return True, ""
+            if mode == "匀速直线运动":
+                return True, ""
+            if mode == "表格折线轨迹":
+                points = self._get_trajectory_table_points()
+                if len(points) < 1:
+                    return False, "表格折线轨迹至少需要 1 个控制点。"
+                # 检查 time_offset_s 是否递增
+                for i in range(1, len(points)):
+                    if points[i][0] <= points[i - 1][0]:
+                        return False, f"表格第 {i + 1} 行的 time_offset_s 必须大于上一行。"
+                return True, ""
+            if mode == "CSV轨迹文件":
+                path = self.csv_path_edit.text().strip()
+                if not path:
+                    return False, "请先导入轨迹 CSV 文件。"
+                if not Path(path).exists():
+                    return False, f"CSV 文件不存在：{path}"
+                return True, ""
+            return False, f"未知的轨迹模式：{mode}"
+
+        def _build_receiver_trajectory(self, mode: str, initial_position: ECEF, start_time: datetime):
+            """根据 GUI 参数构造 receiver_trajectory 和初始概略坐标。"""
+            receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None
+            receiver_initial_approx: Optional[ECEF] = None
+
+            if mode == "匀速直线运动":
+                velocity = (
+                    self.velocity_x_spin.value(),
+                    self.velocity_y_spin.value(),
+                    self.velocity_z_spin.value(),
+                )
+                receiver_trajectory = build_linear_receiver_trajectory(
+                    start_time, initial_position, velocity
+                )
+                receiver_initial_approx = (
+                    initial_position[0] + 50.0,
+                    initial_position[1] - 50.0,
+                    initial_position[2] + 30.0,
+                )
+            elif mode == "表格折线轨迹":
+                points = self._get_trajectory_table_points()
+                x0, y0, z0 = initial_position
+
+                def table_traj(epoch_time: datetime) -> ECEF:
+                    dt = (epoch_time - start_time).total_seconds()
+                    dx, dy, dz = _interpolate_trajectory_point(points, dt)
+                    return (x0 + dx, y0 + dy, z0 + dz)
+
+                receiver_trajectory = table_traj
+                receiver_initial_approx = (
+                    initial_position[0] + 50.0,
+                    initial_position[1] - 50.0,
+                    initial_position[2] + 30.0,
+                )
+            elif mode == "CSV轨迹文件":
+                csv_path = self.csv_path_edit.text().strip()
+                traj_func, msg = _load_trajectory_csv(csv_path, initial_position, start_time)
+                if traj_func is None:
+                    raise ValueError(msg)
+                receiver_trajectory = traj_func
+                receiver_initial_approx = (
+                    initial_position[0] + 50.0,
+                    initial_position[1] - 50.0,
+                    initial_position[2] + 30.0,
+                )
+
+            return receiver_trajectory, receiver_initial_approx
+
+        def preview_trajectory(self) -> None:
+            try:
+                start_time = _qdatetime_to_datetime(self.start_edit.dateTime())
+                end_time = _qdatetime_to_datetime(self.end_edit.dateTime())
+                interval = self.interval_spin.value()
+                mode = self.trajectory_mode_combo.currentText()
+                initial_position = self._receiver_position_from_inputs()
+
+                receiver_trajectory, _ = self._build_receiver_trajectory(
+                    mode, initial_position, start_time
+                )
+
+                if receiver_trajectory is None:
+                    # 静态模式：只有一个点
+                    times = [start_time]
+                    positions = [initial_position]
+                else:
+                    times = []
+                    positions = []
+                    current = start_time
+                    while current <= end_time:
+                        times.append(current)
+                        positions.append(receiver_trajectory(current))
+                        current += timedelta(seconds=interval)
+
+                lats = []
+                lons = []
+                for pos in positions:
+                    lat, lon, _ = ecef_to_blh(*pos)
+                    lats.append(lat)
+                    lons.append(lon)
+
+                ax = self.preview_canvas.figure.clear()
+                ax = self.preview_canvas.figure.add_subplot(111)
+                ax.plot(lons, lats, marker="s", linewidth=1.5, linestyle="--", label="真实轨迹")
+                ax.scatter([lons[0]], [lats[0]], marker="*", s=130, color="green", label="起点", zorder=5)
+                ax.scatter([lons[-1]], [lats[-1]], marker="X", s=130, color="red", label="终点", zorder=5)
+                ax.set_title("轨迹预览：真实接收机轨迹")
+                ax.set_xlabel("经度 (deg)")
+                ax.set_ylabel("纬度 (deg)")
+                ax.grid(True, alpha=0.3)
+                ax.legend(loc="best")
+                self.preview_canvas.draw_idle()
+                self.tabs.setCurrentIndex(2)  # 切换到轨迹预览页
+                self.log(f"轨迹预览已生成：{len(positions)} 个点")
+            except Exception as exc:
+                QMessageBox.critical(self, "预览失败", str(exc))
+                self.log(f"轨迹预览失败：{exc}")
+
         def start_positioning(self) -> None:
             if self.nav_data is None:
                 path = Path(self.nav_path_edit.text())
@@ -591,6 +1039,38 @@ if QT_IMPORT_ERROR is None:
                 return
 
             receiver_position = self._receiver_position_from_inputs()
+            mode = self.trajectory_mode_combo.currentText()
+
+            ok, msg = self._validate_trajectory_params(mode)
+            if not ok:
+                QMessageBox.warning(self, "轨迹参数错误", msg)
+                return
+
+            velocity_mps: Optional[Tuple[float, float, float]] = None
+            trajectory_points: Optional[List[Tuple[float, float, float, float]]] = None
+            trajectory_csv_path: Optional[str] = None
+            receiver_initial_approx: Optional[ECEF] = None
+            receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None
+
+            try:
+                receiver_trajectory, receiver_initial_approx = self._build_receiver_trajectory(
+                    mode, receiver_position, start_time
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "轨迹构造失败", str(exc))
+                return
+
+            if mode == "匀速直线运动":
+                velocity_mps = (
+                    self.velocity_x_spin.value(),
+                    self.velocity_y_spin.value(),
+                    self.velocity_z_spin.value(),
+                )
+            elif mode == "表格折线轨迹":
+                trajectory_points = self._get_trajectory_table_points()
+            elif mode == "CSV轨迹文件":
+                trajectory_csv_path = self.csv_path_edit.text().strip()
+
             self._reset_results()
             self._set_running(True)
             self.worker = PositioningWorker(
@@ -604,6 +1084,11 @@ if QT_IMPORT_ERROR is None:
                 max_iter=self.max_iter_spin.value(),
                 convergence_threshold=self.threshold_spin.value(),
                 elevation_mask_deg=self.elevation_mask_spin.value(),
+                trajectory_mode=mode,
+                velocity_mps=velocity_mps,
+                trajectory_points=trajectory_points,
+                trajectory_csv_path=trajectory_csv_path,
+                receiver_initial_approx=receiver_initial_approx,
             )
             self.worker.progress_row.connect(self.add_result_row)
             self.worker.finished_ok.connect(self.positioning_finished)
@@ -620,6 +1105,9 @@ if QT_IMPORT_ERROR is None:
                 row.get("epoch_time", ""),
                 row.get("status", ""),
                 str(row.get("satellite_count", "")),
+                _format_number(row.get("true_X")),
+                _format_number(row.get("true_Y")),
+                _format_number(row.get("true_Z")),
                 _format_number(row.get("X")),
                 _format_number(row.get("Y")),
                 _format_number(row.get("Z")),
@@ -632,7 +1120,7 @@ if QT_IMPORT_ERROR is None:
             self.result_table.insertRow(table_row)
             for col, text in enumerate(values):
                 item = QTableWidgetItem(text)
-                if col in {2, 3, 4, 5, 6, 7, 8, 9}:
+                if col >= 3:  # 数字列右对齐
                     item.setTextAlignment(QT_ALIGN_RIGHT | QT_ALIGN_VCENTER)
                 self.result_table.setItem(table_row, col, item)
             self.result_table.scrollToBottom()
@@ -697,18 +1185,15 @@ if QT_IMPORT_ERROR is None:
             target_dir = Path(target_name)
             exported = 0
             wanted = [
-                "positioning_results.csv",
                 "module4_continuous_position_results.csv",
-                "accuracy_report.md",
                 "module4_error_statistics.txt",
-                "trajectory.png",
-                "position_error.png",
-                "dop_and_sat_count.png",
-                "module4_trajectory.png",
                 "module4_error_curve.png",
+                "module4_trajectory.png",
+                "module4_true_vs_estimated_trajectory.png",
                 "module4_satellite_dop_curve.png",
-                "test_report.md",
                 "module5_system_test_report.txt",
+                "module5_multi_scenario_summary.csv",
+                "module5_multi_scenario_test_report.txt",
             ]
             for name in wanted:
                 src = source_dir / name
@@ -767,8 +1252,24 @@ if QT_IMPORT_ERROR is None:
             lons = [float(row["lon"]) for row in success_rows]
             lats = [float(row["lat"]) for row in success_rows]
             current_index = min(max(current_index, 0), len(success_rows) - 1)
-            ax.plot(lons[: current_index + 1], lats[: current_index + 1], color="#2563eb", linewidth=1.5)
-            ax.scatter(lons, lats, s=18, color="#94a3b8", label="全部历元")
+
+            # 真实轨迹
+            has_true = all(
+                self._is_finite(row.get("true_lat")) and self._is_finite(row.get("true_lon"))
+                for row in success_rows
+            )
+            if has_true:
+                true_lons = [float(row["true_lon"]) for row in success_rows]
+                true_lats = [float(row["true_lat"]) for row in success_rows]
+                ax.plot(true_lons, true_lats, marker="s", linewidth=1.5, linestyle="--", color="#16a34a", label="真实轨迹")
+                ax.scatter([true_lons[0]], [true_lats[0]], marker="*", s=130, color="green", label="真实起点", zorder=5)
+                ax.scatter([true_lons[-1]], [true_lats[-1]], marker="X", s=130, color="red", label="真实终点", zorder=5)
+
+            # 解算轨迹（已播放部分）
+            ax.plot(lons[: current_index + 1], lats[: current_index + 1], color="#2563eb", linewidth=1.5, label="解算轨迹")
+            # 全部解算历元（淡色）
+            ax.scatter(lons, lats, s=18, color="#94a3b8", label="全部解算历元")
+            # 当前历元
             ax.scatter(
                 [lons[current_index]],
                 [lats[current_index]],

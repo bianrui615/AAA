@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import math
 import traceback
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from basic.module1 import (
     compute_satellite_clock_bias,
@@ -49,7 +49,11 @@ from basic.module3 import (
     save_single_epoch_spp_outputs,
     solve_spp,
 )
-from basic.module4 import AnalysisSummary, run_continuous_positioning
+from basic.module4 import (
+    AnalysisSummary,
+    build_linear_receiver_trajectory,
+    run_continuous_positioning,
+)
 
 
 PROJECT_NAME = "北斗定位解算全流程软件系统"
@@ -89,6 +93,20 @@ TEST_EPOCH_TIME = SIMULATION_START_TIME
 # 是否启用多场景测试。
 ENABLE_MULTI_SCENARIO_TEST = True
 
+# 是否启用动态接收机轨迹。
+ENABLE_RECEIVER_MOTION = True
+
+# 动态接收机参数（仅在 ENABLE_RECEIVER_MOTION=True 时使用）
+RECEIVER_INITIAL_POSITION = (-2267800.0, 5009340.0, 3221000.0)
+
+RECEIVER_VELOCITY_ECEF_MPS = (0.5, 0.2, 0.1)
+
+RECEIVER_INITIAL_APPROX_POSITION = (
+    RECEIVER_INITIAL_POSITION[0] + 50.0,
+    RECEIVER_INITIAL_POSITION[1] - 50.0,
+    RECEIVER_INITIAL_POSITION[2] + 30.0,
+)
+
 
 @dataclass
 class ScenarioConfig:
@@ -104,6 +122,10 @@ class ScenarioConfig:
     max_iter: int
     convergence_threshold: float
     elevation_mask_deg: float
+    enable_receiver_motion: bool = False
+    receiver_initial_position: ECEF = (0.0, 0.0, 0.0)
+    receiver_velocity_mps: ECEF = (0.0, 0.0, 0.0)
+    receiver_initial_approx_position: ECEF = (0.0, 0.0, 0.0)
 
 
 SCENARIOS = [
@@ -118,6 +140,10 @@ SCENARIOS = [
         max_iter=MAX_ITERATIONS,
         convergence_threshold=CONVERGENCE_THRESHOLD,
         elevation_mask_deg=ELEVATION_MASK_DEG,
+        enable_receiver_motion=True,
+        receiver_initial_position=RECEIVER_INITIAL_POSITION,
+        receiver_velocity_mps=RECEIVER_VELOCITY_ECEF_MPS,
+        receiver_initial_approx_position=RECEIVER_INITIAL_APPROX_POSITION,
     ),
     ScenarioConfig(
         name="scenario_2_different_seed",
@@ -130,6 +156,7 @@ SCENARIOS = [
         max_iter=MAX_ITERATIONS,
         convergence_threshold=CONVERGENCE_THRESHOLD,
         elevation_mask_deg=ELEVATION_MASK_DEG,
+        enable_receiver_motion=False,
     ),
     ScenarioConfig(
         name="scenario_3_elevation_mask",
@@ -142,6 +169,10 @@ SCENARIOS = [
         max_iter=MAX_ITERATIONS,
         convergence_threshold=CONVERGENCE_THRESHOLD,
         elevation_mask_deg=10.0,
+        enable_receiver_motion=True,
+        receiver_initial_position=(-2270000.0, 5009000.0, 3220000.0),
+        receiver_velocity_mps=(0.3, 0.1, 0.05),
+        receiver_initial_approx_position=(-2269950.0, 5009050.0, 3220030.0),
     ),
 ]
 
@@ -194,12 +225,37 @@ def write_system_test_report(
         file.write(f"项目名称：{PROJECT_NAME}\n")
         file.write(f"测试时间：{datetime.now().isoformat(sep=' ', timespec='seconds')}\n")
         file.write(f"NAV 文件路径：{Path(nav_file_path)}\n")
-        file.write(
-            "接收机真实 ECEF 坐标："
-            f"X={RECEIVER_TRUE_POSITION[0]:.4f} m，"
-            f"Y={RECEIVER_TRUE_POSITION[1]:.4f} m，"
-            f"Z={RECEIVER_TRUE_POSITION[2]:.4f} m\n"
-        )
+
+        # 接收机运动模型说明
+        if ENABLE_RECEIVER_MOTION:
+            file.write("接收机运动模型：动态接收机（ECEF 匀速直线运动）\n")
+            file.write(
+                f"  初始真实坐标："
+                f"X={RECEIVER_INITIAL_POSITION[0]:.4f} m，"
+                f"Y={RECEIVER_INITIAL_POSITION[1]:.4f} m，"
+                f"Z={RECEIVER_INITIAL_POSITION[2]:.4f} m\n"
+            )
+            file.write(
+                f"  ECEF 速度："
+                f"Vx={RECEIVER_VELOCITY_ECEF_MPS[0]:.4f} m/s，"
+                f"Vy={RECEIVER_VELOCITY_ECEF_MPS[1]:.4f} m/s，"
+                f"Vz={RECEIVER_VELOCITY_ECEF_MPS[2]:.4f} m/s\n"
+            )
+            file.write(
+                f"  初始概略坐标："
+                f"X={RECEIVER_INITIAL_APPROX_POSITION[0]:.4f} m，"
+                f"Y={RECEIVER_INITIAL_APPROX_POSITION[1]:.4f} m，"
+                f"Z={RECEIVER_INITIAL_APPROX_POSITION[2]:.4f} m\n"
+            )
+        else:
+            file.write("接收机运动模型：静态接收机\n")
+            file.write(
+                "接收机真实 ECEF 坐标："
+                f"X={RECEIVER_TRUE_POSITION[0]:.4f} m，"
+                f"Y={RECEIVER_TRUE_POSITION[1]:.4f} m，"
+                f"Z={RECEIVER_TRUE_POSITION[2]:.4f} m\n"
+            )
+
         file.write(f"仿真起始时间：{SIMULATION_START_TIME.isoformat(sep=' ')}\n")
         file.write(f"仿真结束时间：{SIMULATION_END_TIME.isoformat(sep=' ')}\n")
         file.write(f"采样间隔：{SAMPLING_INTERVAL_SECONDS} s\n")
@@ -272,6 +328,18 @@ def run_single_scenario_test(
 
     nav_data, _ = parse_nav_file(scenario.nav_file_path)
 
+    # 根据场景配置构造接收机轨迹
+    if scenario.enable_receiver_motion:
+        receiver_trajectory = build_linear_receiver_trajectory(
+            scenario.start_time,
+            scenario.receiver_initial_position,
+            scenario.receiver_velocity_mps,
+        )
+        receiver_initial_approx = scenario.receiver_initial_approx_position
+    else:
+        receiver_trajectory = None
+        receiver_initial_approx = None
+
     _, summary = run_continuous_positioning(
         nav_data=nav_data,
         start_time=scenario.start_time,
@@ -283,6 +351,8 @@ def run_single_scenario_test(
         max_iter=scenario.max_iter,
         convergence_threshold=scenario.convergence_threshold,
         elevation_mask_deg=scenario.elevation_mask_deg,
+        receiver_trajectory=receiver_trajectory,
+        receiver_initial_approx=receiver_initial_approx,
     )
 
     output_files = [
@@ -328,6 +398,7 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
             "total_epochs", "success_epochs", "failed_epochs", "success_rate",
             "average_satellite_count", "average_pdop", "average_gdop",
             "mean_error_3d", "rms_error_3d", "max_error_3d", "output_dir",
+            "enable_receiver_motion", "receiver_velocity_x", "receiver_velocity_y", "receiver_velocity_z",
         ])
         for result in scenario_results:
             s = result["scenario"]
@@ -353,6 +424,10 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
                 summary.rms_error_3d,
                 summary.max_error_3d,
                 str(result["output_dir"]),
+                s.enable_receiver_motion,
+                s.receiver_velocity_mps[0],
+                s.receiver_velocity_mps[1],
+                s.receiver_velocity_mps[2],
             ])
 
     # 多场景测试报告
@@ -381,6 +456,23 @@ def run_multi_scenario_tests() -> Dict[str, Any]:
             f.write(f"  采样间隔：{s.interval_seconds} s\n")
             f.write(f"  随机种子：{s.random_seed}\n")
             f.write(f"  高度角阈值：{s.elevation_mask_deg}°\n")
+
+            # 动态接收机说明
+            if s.enable_receiver_motion:
+                f.write("  接收机运动模型：动态（ECEF 匀速直线运动）\n")
+                f.write(
+                    f"    初始位置：X={s.receiver_initial_position[0]:.4f} m，"
+                    f"Y={s.receiver_initial_position[1]:.4f} m，"
+                    f"Z={s.receiver_initial_position[2]:.4f} m\n"
+                )
+                f.write(
+                    f"    速度：Vx={s.receiver_velocity_mps[0]:.4f} m/s，"
+                    f"Vy={s.receiver_velocity_mps[1]:.4f} m/s，"
+                    f"Vz={s.receiver_velocity_mps[2]:.4f} m/s\n"
+                )
+            else:
+                f.write("  接收机运动模型：静态\n")
+
             f.write(f"  总历元数：{summary.total_epochs}\n")
             f.write(f"  成功历元数：{summary.success_epochs}\n")
             f.write(f"  失败历元数：{summary.failed_epochs}\n")
@@ -515,17 +607,34 @@ def main() -> int:
         module_status["module3"] = "完成" if single_solution.converged else f"完成但解算失败：{single_solution.message}"
 
         print("模块四：正在进行连续定位与结果分析...")
+
+        # 根据 ENABLE_RECEIVER_MOTION 构造轨迹参数
+        if ENABLE_RECEIVER_MOTION:
+            receiver_trajectory = build_linear_receiver_trajectory(
+                SIMULATION_START_TIME,
+                RECEIVER_INITIAL_POSITION,
+                RECEIVER_VELOCITY_ECEF_MPS,
+            )
+            receiver_initial_approx = RECEIVER_INITIAL_APPROX_POSITION
+            receiver_true_position = RECEIVER_INITIAL_POSITION
+        else:
+            receiver_trajectory = None
+            receiver_initial_approx = None
+            receiver_true_position = RECEIVER_TRUE_POSITION
+
         _, summary = run_continuous_positioning(
             nav_data=nav_data,
             start_time=SIMULATION_START_TIME,
             end_time=SIMULATION_END_TIME,
             interval_seconds=SAMPLING_INTERVAL_SECONDS,
-            receiver_true_position=RECEIVER_TRUE_POSITION,
+            receiver_true_position=receiver_true_position,
             output_dir=output_path,
             random_seed=RANDOM_SEED,
             max_iter=MAX_ITERATIONS,
             convergence_threshold=CONVERGENCE_THRESHOLD,
             elevation_mask_deg=ELEVATION_MASK_DEG,
+            receiver_trajectory=receiver_trajectory,
+            receiver_initial_approx=receiver_initial_approx,
         )
         module_outputs["module4"] = [
             output_path / "module4_continuous_position_results.csv",
