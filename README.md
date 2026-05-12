@@ -122,12 +122,12 @@ python enhance/run_enhance.py
 **模块五**
 - `outputs/basic/module5_system_test_report.txt` — 系统整合与测试报告
 
-当 `ENABLE_MULTI_SCENARIO_TEST = True` 时，还会输出：
-- `outputs/basic/module5_multi_scenario_summary.csv`
-- `outputs/basic/module5_multi_scenario_test_report.txt`
-- `outputs/basic/scenario_1_default/...`
-- `outputs/basic/scenario_2_different_seed/...`
-- `outputs/basic/scenario_3_elevation_mask/...`
+此外，三场景 GUI 批量解算（`python basic/gui_scenario_runner.py`）会输出：
+- `outputs/basic/gui_scenario_runner/gui_three_scenario_summary.csv`
+- `outputs/basic/gui_scenario_runner/gui_three_scenario_report.txt`
+- `outputs/basic/gui_scenario_runner/scenario_1/...`
+- `outputs/basic/gui_scenario_runner/scenario_2/...`
+- `outputs/basic/gui_scenario_runner/scenario_3/...`
 
 ## 提高部分输出文件
 
@@ -158,3 +158,5 @@ RINEX NAV 导航文件统一放在项目根目录下的 `nav/` 文件夹中：
 1. **不读取 .obs 文件**：本项目使用模拟伪距，不依赖真实观测文件。
 2. **数据格式**：默认按 BDS-3 CNAV 格式解析，仅保留北斗三号卫星（PRN >= 19）。
 3. **输出隔离**：`outputs/basic/` 与 `outputs/enhance/` 相互独立，分别存放基础部分与提高部分的输出结果。
+4. **时间系统**：本项目使用 BDS-3 CNAV 文件进行仿真，程序内部将导航文件 toc/toe 与用户设置的仿真历元统一按 BDT 时间系统处理。由于本项目不读取 OBS 文件，不涉及真实观测文件中的 GPST、UTC 与 BDT 转换，因此当前时间处理在仿真系统内部是自洽的。若后续扩展到真实 OBS 解算，需要增加严格的时间系统转换模块。
+5. **收敛阈值**：SPP 迭代以三维坐标改正量范数作为收敛判据，默认收敛阈值为 `1e-2 m`（1 cm）。当连续两次迭代的三维坐标改正量小于该阈值时，认为解算收敛。

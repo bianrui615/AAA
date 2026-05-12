@@ -89,7 +89,11 @@ def write_technical_report(
         f.write(f"{', '.join(FEATURE_COLUMNS)}\n")
         f.write(
             "这些特征涵盖了卫星数量、几何精度因子（PDOP/GDOP）、\n"
-            "伪距统计量、各项误差均值以及高度角信息。\n\n"
+            "伪距统计量、高度角信息以及解算过程中的可观测参数。\n"
+            "为避免数据泄漏，本文未使用伪距模拟误差的真值（如 sisre_error、\n"
+            "iono_error、tropo_error 等）作为输入特征，只使用接收端可观测\n"
+            "或解算过程中可获得的特征进行误差预测，使模型补偿结果更符合\n"
+            "实际工程应用。\n\n"
         )
 
         f.write("6. 标签定义\n")

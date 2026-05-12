@@ -98,6 +98,7 @@ if QT_IMPORT_ERROR is None:
 
 
 def _qdatetime_to_datetime(value: Any) -> datetime:
+    """将 QDateTime 转换为 Python datetime（无时区，统一按 BDT 理解）。"""
     return datetime(
         value.date().year(),
         value.date().month(),
@@ -1192,8 +1193,6 @@ if QT_IMPORT_ERROR is None:
                 "module4_true_vs_estimated_trajectory.png",
                 "module4_satellite_dop_curve.png",
                 "module5_system_test_report.txt",
-                "module5_multi_scenario_summary.csv",
-                "module5_multi_scenario_test_report.txt",
             ]
             for name in wanted:
                 src = source_dir / name

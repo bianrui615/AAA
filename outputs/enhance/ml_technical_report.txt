@@ -24,10 +24,14 @@
 
 5. 特征工程说明
 ----------------------------------------
-共使用 19 个数值特征，包括：
-satellite_count, raw_satellite_count, PDOP, GDOP, clock_bias, iteration_count, elevation_mask_deg, mean_pseudorange, std_pseudorange, mean_rho, std_rho, mean_sisre_error, mean_iono_error, mean_tropo_error, mean_receiver_clock_error, mean_noise_error, mean_elevation_deg, min_elevation_deg, max_elevation_deg
+共使用 14 个数值特征，包括：
+satellite_count, raw_satellite_count, PDOP, GDOP, clock_bias, iteration_count, elevation_mask_deg, mean_pseudorange, std_pseudorange, mean_rho, std_rho, mean_elevation_deg, min_elevation_deg, max_elevation_deg
 这些特征涵盖了卫星数量、几何精度因子（PDOP/GDOP）、
-伪距统计量、各项误差均值以及高度角信息。
+伪距统计量、高度角信息以及解算过程中的可观测参数。
+为避免数据泄漏，本文未使用伪距模拟误差的真值（如 sisre_error、
+iono_error、tropo_error 等）作为输入特征，只使用接收端可观测
+或解算过程中可获得的特征进行误差预测，使模型补偿结果更符合
+实际工程应用。
 
 6. 标签定义
 ----------------------------------------
@@ -51,9 +55,9 @@ error_z = true_z - spp_z
 
 9. 训练集/测试集划分
 ----------------------------------------
-总样本数：26
-训练集：18（70%）
-测试集：8（30%）
+总样本数：723
+训练集：506（70%）
+测试集：217（30%）
 划分方式：sklearn.train_test_split，random_state=2026
 
 10. 补偿公式
@@ -64,12 +68,12 @@ compensated_z = spp_z + pred_error_z
 
 11. 补偿前后误差对比
 ----------------------------------------
-线性回归：RMS 误差 69.423917 m → 75.282994 m
-随机森林：RMS 误差 69.423917 m → 67.070414 m
+线性回归：RMS 误差 5.070799 m → 3.576497 m
+随机森林：RMS 误差 5.070799 m → 5.822980 m
 
 12. 两个模型结果对比
 ----------------------------------------
-随机森林补偿后 RMS 误差更低，整体效果优于线性回归。
+线性回归补偿后 RMS 误差更低，整体效果优于随机森林。
 详细统计请参见 outputs/enhance/ml_compensation_statistics.txt
 
 13. 优势、不足和改进方向

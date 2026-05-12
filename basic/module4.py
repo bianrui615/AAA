@@ -170,7 +170,7 @@ def run_continuous_positioning(
     output_dir: str | Path = "outputs/basic",
     random_seed: Optional[int] = 2026,
     max_iter: int = 10,
-    convergence_threshold: float = 1e-4,
+    convergence_threshold: float = 1e-2,
     elevation_mask_deg: float = 0.0,
     progress_callback: Optional[Callable[[dict, int, int], None]] = None,
     receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None,

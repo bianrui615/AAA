@@ -43,6 +43,12 @@ SECONDS_IN_WEEK = 604_800.0
 HALF_WEEK = 302_400.0
 RELATIVITY_F = -2.0 * math.sqrt(MU) / (C * C)
 
+PROJECT_TIME_SYSTEM = "BDT"
+# 本项目不读取 OBS 文件，所有仿真历元 epoch_time 与 RINEX CNAV 中的 toc/toe
+# 统一按 BDT 时间系统理解。
+# 当前不做 UTC/GPST/BDT 转换。
+# 如果后续接入真实 OBS 文件，需要单独实现时间系统转换模块。
+
 # WGS84 椭球常数（从 module3 迁移）
 WGS84_A = 6378137.0
 WGS84_F = 1.0 / 298.257223563
@@ -161,7 +167,12 @@ def parse_nav_4_fields(line: str, start: int = 4) -> List[float]:
 
 
 def _parse_epoch_from_first_line(line: str) -> datetime:
-    """解析 RINEX 3.x 导航记录首行中的星历钟参考时间 toc。"""
+    """解析 RINEX 3.x 导航记录首行中的星历钟参考时间 toc。
+
+    该函数解析 RINEX CNAV 记录首行中的 toc。
+    本项目将 toc 作为 BDT 时间系统下的无时区 datetime 使用。
+    不在此处执行 UTC/GPST/BDT 转换。
+    """
     year = int(line[4:8])
     month = int(line[9:11])
     day = int(line[12:14])
@@ -170,6 +181,13 @@ def _parse_epoch_from_first_line(line: str) -> datetime:
     second_text = line[21:23].strip() or "0"
     second = int(float(second_text))
     return datetime(year, month, day, hour, minute, second)
+
+
+def ensure_bdt_naive_datetime(value: datetime) -> datetime:
+    """确保时间为无时区 datetime，并在本项目中统一按 BDT 理解。"""
+    if value.tzinfo is not None:
+        raise ValueError("本项目当前要求使用无时区 datetime，并统一按 BDT 时间系统理解")
+    return value
 
 
 def _build_ephemeris(record_lines: List[str]) -> Optional[BroadcastEphemeris]:
@@ -460,6 +478,7 @@ def select_ephemeris_for_epoch(
     如果同一时刻出现多条记录，优先选择字段完整（parse_status == 'ok'）
     且 health == 0 的记录。
     """
+    epoch = ensure_bdt_naive_datetime(epoch)
     if not records:
         return None
 
@@ -494,6 +513,7 @@ def select_ephemeris(
     healthy_only: bool = False,
 ) -> Optional[BroadcastEphemeris]:
     """为指定卫星和历元选择 toc 时间最接近的星历。"""
+    epoch_time = ensure_bdt_naive_datetime(epoch_time)
     eph_list = nav_data.get(sat_id)
     if not eph_list:
         return None
@@ -508,7 +528,11 @@ def select_ephemeris(
 # 卫星位置计算（从 module2 迁移）
 # ============================================================================
 def _bds_seconds_of_week(epoch_time: datetime) -> float:
-    """将 datetime 转换为 BDS 周内秒。"""
+    """将 datetime 转换为 BDS 周内秒。
+
+    输入 epoch_time 必须是按 BDT 理解的无时区 datetime。
+    """
+    epoch_time = ensure_bdt_naive_datetime(epoch_time)
     total_seconds = (epoch_time - BDT_EPOCH).total_seconds()
     return total_seconds % SECONDS_IN_WEEK
 
@@ -557,6 +581,7 @@ def compute_satellite_position(
     返回 (sat_x, sat_y, sat_z)，单位为米。
     算法依据：北斗 ICD 文件广播星历标准公式。
     """
+    epoch_time = ensure_bdt_naive_datetime(epoch_time)
     if eph.sqrt_a <= 0.0:
         raise ValueError(f"{eph.sat_id} 的 sqrtA 非法：{eph.sqrt_a}")
 
@@ -640,7 +665,11 @@ def compute_satellite_clock_bias(
         e：轨道偏心率
         sqrt(a)：轨道长半轴平方根（单位：sqrt(m)）
         E：偏近点角（单位：rad）
+
+    dt_clock = epoch_time - eph.toc
+    其中 epoch_time 和 eph.toc 在本项目中均统一按 BDT 时间系统理解。
     """
+    epoch_time = ensure_bdt_naive_datetime(epoch_time)
     # 计算观测历元相对星历钟参考时刻 toc 的时间差 dt_clock（单位：s）
     dt_clock = _normalize_time((epoch_time - eph.toc).total_seconds())
 
@@ -692,6 +721,7 @@ def compute_satellite_position_with_debug(
     - x_orb, y_orb: 轨道平面坐标（m）
     - is_geo: 是否为 GEO 卫星
     """
+    epoch_time = ensure_bdt_naive_datetime(epoch_time)
     if eph.sqrt_a <= 0.0:
         raise ValueError(f"{eph.sat_id} 的 sqrtA 非法：{eph.sqrt_a}")
 

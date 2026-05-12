@@ -38,6 +38,7 @@ from basic.module3 import (
 )
 from enhance.enhance_config import (
     BASE_OUTPUT_DIR,
+    EXTRA_ANALYSIS_COLUMNS,
     FEATURE_COLUMNS,
     LABEL_COLUMNS,
     SCENARIO_OUTPUT_DIR,
@@ -255,7 +256,7 @@ def build_dataset() -> Path:
     all_columns = [
         "scenario_name",
         "epoch_time",
-    ] + FEATURE_COLUMNS + [
+    ] + FEATURE_COLUMNS + EXTRA_ANALYSIS_COLUMNS + [
         "spp_x", "spp_y", "spp_z",
         "true_x", "true_y", "true_z",
     ] + LABEL_COLUMNS + ["error_3d_before"]

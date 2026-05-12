@@ -26,7 +26,7 @@ class ScenarioConfig:
     interval_seconds: int
     random_seed: int
     max_iter: int = 12
-    convergence_threshold: float = 1e-4
+    convergence_threshold: float = 1e-2
     elevation_mask_deg: float = 0.0
 
 
@@ -48,7 +48,7 @@ SCENARIOS: List[ScenarioConfig] = [
         interval_seconds=30,
         random_seed=2026,
         max_iter=12,
-        convergence_threshold=1e-4,
+        convergence_threshold=1e-2,
         elevation_mask_deg=0.0,
     ),
     ScenarioConfig(
@@ -60,7 +60,7 @@ SCENARIOS: List[ScenarioConfig] = [
         interval_seconds=30,
         random_seed=42,
         max_iter=12,
-        convergence_threshold=1e-4,
+        convergence_threshold=1e-2,
         elevation_mask_deg=0.0,
     ),
     ScenarioConfig(
@@ -72,12 +72,14 @@ SCENARIOS: List[ScenarioConfig] = [
         interval_seconds=30,
         random_seed=2027,
         max_iter=12,
-        convergence_threshold=1e-4,
+        convergence_threshold=1e-2,
         elevation_mask_deg=10.0,
     ),
 ]
 
 # 数值特征列（用于模型训练）
+# 注意：为避免数据泄漏，只使用接收端可观测或解算过程中可获得的特征，
+# 不使用伪距模拟误差的真值（如 mean_sisre_error、mean_iono_error 等）。
 FEATURE_COLUMNS: List[str] = [
     "satellite_count",
     "raw_satellite_count",
@@ -90,14 +92,18 @@ FEATURE_COLUMNS: List[str] = [
     "std_pseudorange",
     "mean_rho",
     "std_rho",
+    "mean_elevation_deg",
+    "min_elevation_deg",
+    "max_elevation_deg",
+]
+
+# 额外分析列（仅用于 ml_dataset.csv 中的误差分析，不作为模型输入特征）
+EXTRA_ANALYSIS_COLUMNS: List[str] = [
     "mean_sisre_error",
     "mean_iono_error",
     "mean_tropo_error",
     "mean_receiver_clock_error",
     "mean_noise_error",
-    "mean_elevation_deg",
-    "min_elevation_deg",
-    "max_elevation_deg",
 ]
 
 # 标签列（三维坐标误差）

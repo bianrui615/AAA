@@ -449,7 +449,7 @@ def solve_spp(
     initial_position: Optional[ECEF] = None,
     initial_clock_bias: float = 0.0,
     max_iter: int = 10,
-    convergence_threshold: float = 1e-4,
+    convergence_threshold: float = 1e-2,
     satellite_health: Optional[Dict[str, float]] = None,
     elevation_mask_deg: float = 0.0,
     enable_pseudorange_outlier_filter: bool = False,
@@ -715,7 +715,7 @@ if __name__ == "__main__":
     TEST_EPOCH_TIME = datetime(2026, 4, 1, 0, 0, 0)
     RANDOM_SEED = 2026
     MAX_ITERATIONS = 12
-    CONVERGENCE_THRESHOLD = 1e-4
+    CONVERGENCE_THRESHOLD = 1e-2
     ELEVATION_MASK_DEG = 0.0
     OUTPUT_DIR = "outputs/basic"
 

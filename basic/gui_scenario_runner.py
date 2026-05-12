@@ -923,7 +923,7 @@ if QT_IMPORT_ERROR is None:
                     "random_seed": 2026,
                     "elevation_mask_deg": 0.0,
                     "max_iter": 12,
-                    "convergence_threshold": 1e-4,
+                    "convergence_threshold": 1e-2,
                     "trajectory_points": [(0, 0, 0, 0), (21600, 0, 0, 0)],
                 },
                 {
@@ -941,7 +941,7 @@ if QT_IMPORT_ERROR is None:
                     "random_seed": 42,
                     "elevation_mask_deg": 0.0,
                     "max_iter": 12,
-                    "convergence_threshold": 1e-4,
+                    "convergence_threshold": 1e-2,
                     "trajectory_points": [(0, 0, 0, 0), (21600, 0, 0, 0)],
                 },
                 {
@@ -959,7 +959,7 @@ if QT_IMPORT_ERROR is None:
                     "random_seed": 2027,
                     "elevation_mask_deg": 0.0,
                     "max_iter": 12,
-                    "convergence_threshold": 1e-4,
+                    "convergence_threshold": 1e-2,
                     "trajectory_points": [
                         (0, 0, 0, 0),
                         (3600, 800, 300, 100),
