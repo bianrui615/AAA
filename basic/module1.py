@@ -36,6 +36,7 @@ from typing import Dict, List, Optional, Tuple
 MU = 3.986004418e14  # 地球引力常数，单位 m^3/s^2
 OMEGA_E = 7.2921150e-5  # 地球自转角速度，单位 rad/s
 C = 299_792_458.0  # 光速，单位 m/s
+BDS_CNAV_A_REF = 27_906_100.0  # BDS-3 CNAV DeltaA reference semi-major axis, m
 
 BDT_EPOCH = datetime(2006, 1, 1, 0, 0, 0)  # 北斗时起点近似
 SECONDS_IN_WEEK = 604_800.0
@@ -102,6 +103,7 @@ class BroadcastEphemeris:
     tgd1: float  # BDS TGD1 群延迟，单位 s
     tgd2: float  # BDS TGD2 群延迟，单位 s
     transmission_time: float  # 电文发射时刻，BDS 周内秒
+    a_dot: float = 0.0  # CNAV semi-major axis rate, m/s
     fit_interval: float = 0.0
     parse_status: str = "ok"  # 解析状态：ok / partial / failed
 
@@ -265,9 +267,10 @@ def _build_ephemeris_cnav(record_lines: List[str]) -> Optional[BroadcastEphemeri
     line2 = parse_nav_4_fields(record_lines[1])
     aode, crs, delta_n, m0 = line2[0], line2[1], line2[2], line2[3]
 
-    # 第 3 行：cuc, e, cus, sqrtA
+    # 第 3 行：cuc, e, cus, DeltaA
     line3 = parse_nav_4_fields(record_lines[2])
-    cuc, e, cus, sqrtA = line3[0], line3[1], line3[2], line3[3]
+    cuc, e, cus, delta_a = line3[0], line3[1], line3[2], line3[3]
+    sqrtA = math.sqrt(BDS_CNAV_A_REF + delta_a)
 
     # 第 4 行：toe, cic, omega0, cis
     line4 = parse_nav_4_fields(record_lines[3])
@@ -277,9 +280,9 @@ def _build_ephemeris_cnav(record_lines: List[str]) -> Optional[BroadcastEphemeri
     line5 = parse_nav_4_fields(record_lines[4])
     i0, crc, omega, omega_dot = line5[0], line5[1], line5[2], line5[3]
 
-    # 第 6 行：idot, spare, bdt_week, extra
+    # 第 6 行：idot, spare, bdt_week, A_dot
     line6 = parse_nav_4_fields(record_lines[5])
-    idot, data_source, bdt_week, _ = line6[0], line6[1], line6[2], line6[3]
+    idot, data_source, bdt_week, a_dot = line6[0], line6[1], line6[2], line6[3]
 
     # 第 7 行：第 2 个字段作为 health
     line7 = parse_nav_4_fields(record_lines[6])
@@ -335,6 +338,7 @@ def _build_ephemeris_cnav(record_lines: List[str]) -> Optional[BroadcastEphemeri
         tgd1=tgd1,
         tgd2=tgd2,
         transmission_time=transmission_time,
+        a_dot=a_dot,
         fit_interval=fit_interval,
         parse_status=parse_status,
     )
@@ -538,6 +542,12 @@ def _is_bds_geo(sat_id: str) -> bool:
     return 1 <= prn <= 5 or 59 <= prn <= 63
 
 
+def _semi_major_axis(eph: BroadcastEphemeris, tk: float = 0.0) -> float:
+    """Return semi-major axis in meters, including CNAV A_dot when present."""
+
+    return eph.sqrt_a * eph.sqrt_a + getattr(eph, "a_dot", 0.0) * tk
+
+
 def compute_satellite_position(
     eph: BroadcastEphemeris,
     epoch_time: datetime,
@@ -553,7 +563,7 @@ def compute_satellite_position(
     t = _bds_seconds_of_week(epoch_time)
     tk = _normalize_time(t - eph.toe)
 
-    semi_major_axis = eph.sqrt_a * eph.sqrt_a
+    semi_major_axis = _semi_major_axis(eph, tk)
     mean_motion_0 = math.sqrt(MU / (semi_major_axis ** 3))
     mean_motion = mean_motion_0 + eph.delta_n
 
@@ -638,7 +648,7 @@ def compute_satellite_clock_bias(
     # 计算过程与 compute_satellite_position 中完全一致，确保 E 相同
     t = _bds_seconds_of_week(epoch_time)
     tk = _normalize_time(t - eph.toe)
-    semi_major_axis = eph.sqrt_a * eph.sqrt_a
+    semi_major_axis = _semi_major_axis(eph, tk)
     mean_motion_0 = math.sqrt(MU / (semi_major_axis ** 3))
     mean_motion = mean_motion_0 + eph.delta_n
     mean_anomaly = math.fmod(eph.m0 + mean_motion * tk, 2.0 * math.pi)
@@ -648,7 +658,7 @@ def compute_satellite_clock_bias(
     # 相对论效应修正（单位：s）
     # 公式：F * e * sqrt(a) * sin(E)
     # RELATIVITY_F = -2 * sqrt(MU) / (C * C)，已在模块顶部定义
-    relativity = RELATIVITY_F * eph.eccentricity * eph.sqrt_a * sin_e
+    relativity = RELATIVITY_F * eph.eccentricity * math.sqrt(semi_major_axis) * sin_e
 
     # 卫星钟差多项式修正（单位：s）
     # 公式：af0 + af1 * dt + af2 * dt^2
@@ -690,7 +700,7 @@ def compute_satellite_position_with_debug(
     tk = _normalize_time(t - eph.toe)
 
     # 轨道参数
-    semi_major_axis = eph.sqrt_a * eph.sqrt_a
+    semi_major_axis = _semi_major_axis(eph, tk)
     mean_motion_0 = math.sqrt(MU / (semi_major_axis ** 3))
     mean_motion = mean_motion_0 + eph.delta_n
     mean_anomaly = math.fmod(eph.m0 + mean_motion * tk, 2.0 * math.pi)

@@ -270,7 +270,9 @@ def run_continuous_positioning(
             convergence_threshold=convergence_threshold,
             elevation_mask_deg=elevation_mask_deg,
             enable_pseudorange_outlier_filter=False,
-            apply_corrections=True,
+            # The simulated pseudorange model does not inject broadcast satellite
+            # clock bias, so corrections are reported below but not applied here.
+            apply_corrections=False,
             satellite_clock_biases=satellite_clock_biases,
             satellite_elevations=satellite_elevations,
         )
