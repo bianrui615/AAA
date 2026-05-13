@@ -4,6 +4,4 @@ pandas
 pytest
 scikit-learn
 joblib
-PyQt6
-PySide6
 PyQt5
