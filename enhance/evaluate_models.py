@@ -10,11 +10,17 @@ from __future__ import annotations
 import csv
 import math
 import os
+import sys
 from pathlib import Path
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+# 确保项目根目录在 sys.path 中
+_project_root = Path(__file__).resolve().parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 from enhance.enhance_config import BASE_OUTPUT_DIR, FIGURE_OUTPUT_DIR
 
