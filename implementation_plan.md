@@ -30,7 +30,7 @@
    - `filter_visible_satellites(sat_positions, receiver_pos, mask_deg=15.0)` — 计算高度角并筛选
    - `generate_simulated_observations(nav_data, receiver_pos, duration, interval, seed)` — 按误差模型生成伪距
 2. 新增输出文件：
-   - `nav_params.csv` — 保留现有 `module1_ephemeris_list.csv` 内容，扩展为包含全部所需星历参数字段
+   - `nav_params.csv` — 保留现有 `module1_星历列表.csv` 内容，扩展为包含全部所需星历参数字段
    - `simulated_obs.csv` — 列：`epoch, prn, rho, sisre, iono, trop, rcv_clock, noise, pseudorange, elevation`
    - `available_sats.csv` — 列：`epoch, prn, elevation_deg`
 3. 接口函数签名按用户要求：
@@ -53,7 +53,7 @@
    - `correct_pseudorange(raw_pseudorange, sat_clock_bias_m, iono_m, trop_dry_m, trop_wet_m) -> corrected_pseudorange`
 3. 扩展 `SatelliteState` dataclass，增加 `delta_u`, `delta_r`, `delta_i` 字段
 4. 新增输出文件：
-   - `sat_position.csv` — 扩展现有 `module2_satellite_position_clock.csv`，增加 `delta_u, delta_r, delta_i` 列
+   - `sat_position.csv` — 扩展现有 `module2_卫星位置与钟差.csv`，增加 `delta_u, delta_r, delta_i` 列
    - `sat_clock.csv` — 新增：`epoch, prn, polynomial_corr, relativity_corr, total_clock_bias`
    - `delay_correction.csv` — 新增：`epoch, prn, trop_dry, trop_wet, iono, total_delay`
    - `corrected_pseudorange.csv` — 新增：`epoch, prn, P_raw, P_corrected`

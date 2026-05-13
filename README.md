@@ -104,23 +104,23 @@ python enhance/run_enhance.py
 - `outputs/basic/module/module1_nav_parse_summary.txt` — 解析摘要
 
 **模块二**
-- `outputs/basic/module/module2_satellite_position_clock.csv` — 卫星位置与钟差
-- `outputs/basic/module/module2_satellite_position_summary.txt` — 计算摘要
+- `outputs/basic/<nav文件名>/module2_卫星位置与钟差.csv` — 卫星位置与钟差
+- `outputs/basic/<nav文件名>/module2_卫星位置汇总.txt` — 计算摘要
 - `outputs/basic/module/module2_pseudorange_correction_debug.csv` — 伪距修正调试文件（仅用于展示 rho、卫星钟差、各项误差与模拟伪距之间的关系，**不参与 SPP 解算**）
 
 **模块三**
-- `outputs/basic/module/module3_pseudorange_single_epoch.csv` — 单历元伪距明细
-- `outputs/basic/module/module3_spp_result_single_epoch.txt` — 单历元 SPP 解算报告
+- `outputs/basic/<nav文件名>/module3_单历元伪距.csv` — 单历元伪距明细
+- `outputs/basic/<nav文件名>/module3_单历元定位结果.txt` — 单历元 SPP 解算报告
 
 **模块四**
-- `outputs/basic/module/module4_continuous_position_results.csv` — 连续定位结果
+- `outputs/basic/<nav文件名>/module4_连续定位结果.csv` — 连续定位结果
 - `outputs/basic/module/module4_error_statistics.txt` — 误差统计
-- `outputs/basic/module/module4_error_curve.png` — 误差曲线
-- `outputs/basic/module/module4_trajectory.png` — 经纬度轨迹图
-- `outputs/basic/module/module4_satellite_dop_curve.png` — 卫星数与 DOP 曲线
+- `outputs/basic/<nav文件名>/module4_误差曲线.png` — 误差曲线
+- `outputs/basic/<nav文件名>/module4_轨迹图.png` — 经纬度轨迹图
+- `outputs/basic/<nav文件名>/module4_卫星DOP曲线.png` — 卫星数与 DOP 曲线
 
 **模块五**
-- `outputs/basic/module/module5_system_test_report.txt` — 系统整合与测试报告
+- `outputs/basic/<nav文件名>/module5_系统测试报告.txt` — 系统整合与测试报告
 
 此外，三场景 GUI 批量解算（`python basic/gui_scenario_runner.py`）会输出：
 - `outputs/basic/gui_scenario_runner/gui_three_scenario_summary.csv`
@@ -133,18 +133,18 @@ python enhance/run_enhance.py
 
 运行 `python enhance/run_enhance.py` 后，输出统一存放在 `outputs/enhance/`，其中 txt/csv 结果位于 `outputs/enhance/ml/`：
 
-- `ml/ml_dataset.csv` — 机器学习数据集
-- `models/linear_regression_model.joblib` — 线性回归模型
-- `models/random_forest_model.joblib` — 随机森林模型
-- `ml/predictions/linear_regression_predictions.csv` — 线性回归补偿结果
-- `ml/predictions/random_forest_predictions.csv` — 随机森林补偿结果
-- `ml/model_comparison_summary.csv` — 模型对比指标
-- `ml/ml_compensation_statistics.txt` — 补偿统计报告
-- `figures/error_curve_linear_regression.png` — 误差曲线
-- `figures/error_curve_random_forest.png` — 误差曲线
-- `figures/model_comparison_bar.png` — 模型对比柱状图
-- `figures/predicted_vs_true_error.png` — 预测误差散点图
-- `ml/ml_technical_report.txt` — 技术报告
+- `ml/机器学习数据集.csv` — 机器学习数据集
+- `models/线性回归模型.joblib` — 线性回归模型
+- `models/随机森林模型.joblib` — 随机森林模型
+- `ml/predictions/linear_regression_补偿预测.csv` — 线性回归补偿结果
+- `ml/predictions/random_forest_补偿预测.csv` — 随机森林补偿结果
+- `ml/模型对比汇总.csv` — 模型对比指标
+- `ml/补偿效果统计.txt` — 补偿统计报告
+- `figures/linear_regression_误差曲线.png` — 线性回归误差曲线
+- `figures/random_forest_误差曲线.png` — 随机森林误差曲线
+- `figures/模型对比柱状图.png` — 模型对比柱状图
+- `figures/预测与真实误差对比.png` — 预测误差散点图
+- `ml/技术报告.txt` — 技术报告
 
 ## 导航文件
 

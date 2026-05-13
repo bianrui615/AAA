@@ -15,7 +15,7 @@ import csv
 import math
 import random
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -56,16 +56,150 @@ def _time_range(start_time, end_time, interval_seconds: int):
         current += step
 
 
+def _get_basic_output_dir(nav_file_path: str) -> Path:
+    """根据 NAV 文件名找到基础部分对应的输出目录。"""
+    nav_name = Path(nav_file_path).name
+    safe_name = nav_name.replace(".", "_")
+    return Path(f"outputs/basic/{safe_name}")
+
+
+def _load_from_basic_csv(scenario: ScenarioConfig) -> Optional[List[dict]]:
+    """尝试从基础部分 outputs/basic/<nav_name>/module4_连续定位结果.csv 加载已有数据，
+    并补充缺失的伪距统计特征。
+
+    如果 CSV 不存在或解析失败，返回 None。
+    """
+    basic_dir = _get_basic_output_dir(scenario.nav_file_path)
+    csv_path = basic_dir / "module4_连续定位结果.csv"
+    if not csv_path.exists():
+        return None
+
+    print(f"  [dataset_builder] 从基础部分加载已有数据：{csv_path}")
+    nav_data, _ = parse_nav_file(scenario.nav_file_path)
+    rng = random.Random(scenario.random_seed)
+
+    rows: List[dict] = []
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            epoch_time = datetime.fromisoformat(row["epoch_time"].replace(" ", "T"))
+            # 收集卫星位置
+            satellite_positions: Dict[str, Tuple[float, float, float]] = {}
+            for sat_id in sorted(nav_data):
+                eph = select_ephemeris(nav_data, sat_id, epoch_time, healthy_only=True)
+                if eph is None:
+                    continue
+                try:
+                    x, y, z = compute_satellite_position(eph, epoch_time)
+                    if math.sqrt(x * x + y * y + z * z) <= 0.0:
+                        continue
+                    satellite_positions[sat_id] = (x, y, z)
+                except Exception:
+                    continue
+
+            raw_satellite_count = len(satellite_positions)
+            if raw_satellite_count < 4:
+                rows.append(
+                    {
+                        "scenario_name": scenario.name,
+                        "epoch_time": row["epoch_time"],
+                        "status": "失败",
+                        "failure_reason": "可用卫星数量少于 4 颗",
+                        "raw_satellite_count": raw_satellite_count,
+                    }
+                )
+                continue
+
+            true_x = float(row.get("true_X", 0))
+            true_y = float(row.get("true_Y", 0))
+            true_z = float(row.get("true_Z", 0))
+            spp_x = float(row.get("X", 0))
+            spp_y = float(row.get("Y", 0))
+            spp_z = float(row.get("Z", 0))
+            error_3d = float(row.get("error_3d", "nan"))
+            status = row.get("status", "失败")
+
+            # 使用 CSV 中的真实坐标作为接收机位置，保证伪距统计与定位结果一致
+            receiver_true_position = (true_x, true_y, true_z)
+            pseudo_records = generate_simulated_pseudorange_records(
+                satellite_positions,
+                receiver_true_position,
+                epoch_time,
+                rng=rng,
+            )
+            pseudorange_values = [r["simulated_pseudorange"] for r in pseudo_records]
+            rho_values = [r["rho"] for r in pseudo_records]
+            sisre_values = [r["sisre_error"] for r in pseudo_records]
+            iono_values = [r["iono_error"] for r in pseudo_records]
+            tropo_values = [r["tropo_error"] for r in pseudo_records]
+            clock_values = [r["receiver_clock_error"] for r in pseudo_records]
+            noise_values = [r["noise_error"] for r in pseudo_records]
+            elevation_values = [r["elevation_deg"] for r in pseudo_records]
+
+            record: dict = {
+                "scenario_name": scenario.name,
+                "epoch_time": row["epoch_time"],
+                "satellite_count": int(row.get("satellite_count", 0)),
+                "raw_satellite_count": int(row.get("raw_satellite_count", raw_satellite_count)),
+                "PDOP": float(row.get("PDOP", "nan")),
+                "GDOP": float(row.get("GDOP", "nan")),
+                "clock_bias": float(row.get("clock_bias", "nan")),
+                "iteration_count": int(row.get("iteration_count", 0)),
+                "elevation_mask_deg": float(row.get("elevation_mask_deg", 0.0)),
+                "mean_pseudorange": float(np.mean(pseudorange_values)),
+                "std_pseudorange": float(np.std(pseudorange_values)),
+                "mean_rho": float(np.mean(rho_values)),
+                "std_rho": float(np.std(rho_values)),
+                "mean_sisre_error": float(np.mean(sisre_values)),
+                "mean_iono_error": float(np.mean(iono_values)),
+                "mean_tropo_error": float(np.mean(tropo_values)),
+                "mean_receiver_clock_error": float(np.mean(clock_values)),
+                "mean_noise_error": float(np.mean(noise_values)),
+                "mean_elevation_deg": float(np.mean(elevation_values)),
+                "min_elevation_deg": float(np.min(elevation_values)),
+                "max_elevation_deg": float(np.max(elevation_values)),
+                "spp_x": spp_x,
+                "spp_y": spp_y,
+                "spp_z": spp_z,
+                "true_x": true_x,
+                "true_y": true_y,
+                "true_z": true_z,
+                "error_x": true_x - spp_x,
+                "error_y": true_y - spp_y,
+                "error_z": true_z - spp_z,
+                "error_3d_before": error_3d if math.isfinite(error_3d) else math.nan,
+                "status": status,
+                "failure_reason": "" if status == "成功" else row.get("failure_reason", ""),
+            }
+            rows.append(record)
+
+    success_count = sum(1 for r in rows if r["status"] == "成功")
+    print(
+        f"  [dataset_builder] 从基础部分加载完成："
+        f"成功 {success_count} 历元，失败 {len(rows) - success_count} 历元"
+    )
+    return rows
+
+
 def run_scenario_and_collect(
     scenario: ScenarioConfig,
     save_scenario_csv: bool = True,
 ) -> List[dict]:
     """运行单个场景，逐历元解算并收集特征与标签。
 
+    优先尝试从基础部分 outputs/basic/ 加载已有结果；
+    如果不存在，则重新调用 basic/ 模块生成。
+
     返回列表中每个字典对应一个历元（成功或失败）。
     失败历元会被记录但后续不参与训练。
     """
     print(f"  [dataset_builder] 正在运行场景：{scenario.name}")
+
+    # 优先从基础部分加载已有数据
+    loaded = _load_from_basic_csv(scenario)
+    if loaded is not None:
+        return loaded
+
     nav_data, _ = parse_nav_file(scenario.nav_file_path)
     rng = random.Random(scenario.random_seed)
 

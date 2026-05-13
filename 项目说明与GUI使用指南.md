@@ -91,7 +91,7 @@ tarc0910.26b
 
 ```text
 outputs/basic/module/module1_nav_parse_summary.txt
-outputs/basic/module/module1_ephemeris_list.csv
+outputs/basic/<nav文件名>/module1_星历列表.csv
 ```
 
 `module1_nav_parse_summary.txt` 表示解析摘要，主要字段含义：
@@ -106,7 +106,7 @@ outputs/basic/module/module1_ephemeris_list.csv
 - `每颗北斗卫星对应的星历记录数`：各卫星可用星历数量；
 - `健康状态检查`：列出 health 非 0 的异常卫星和异常记录数量。
 
-`module1_ephemeris_list.csv` 表示星历明细，主要字段含义：
+`module1_星历列表.csv` 表示星历明细，主要字段含义：
 
 - `sat_id`：卫星编号；
 - `toc_time`：卫星钟参考时间；
@@ -164,11 +164,11 @@ outputs/basic/module/module1_ephemeris_list.csv
 模块二输出两个文件：
 
 ```text
-outputs/basic/module/module2_satellite_position_clock.csv
-outputs/basic/module/module2_satellite_position_summary.txt
+outputs/basic/<nav文件名>/module2_卫星位置与钟差.csv
+outputs/basic/<nav文件名>/module2_卫星位置汇总.txt
 ```
 
-`module2_satellite_position_clock.csv` 表示每颗卫星在测试历元的计算结果，字段含义：
+`module2_卫星位置与钟差.csv` 表示每颗卫星在测试历元的计算结果，字段含义：
 
 - `epoch_time`：测试历元；
 - `sat_id`：卫星编号；
@@ -179,7 +179,7 @@ outputs/basic/module/module2_satellite_position_summary.txt
 - `health`：卫星健康状态；
 - `status`：计算状态，例如 `计算成功`、`跳过：未找到健康星历`、`卫星坐标数量级异常`。
 
-`module2_satellite_position_summary.txt` 表示卫星位置计算摘要，主要说明：
+`module2_卫星位置汇总.txt` 表示卫星位置计算摘要，主要说明：
 
 - 候选北斗卫星数量；
 - 参与计算的健康卫星数量；
@@ -246,11 +246,11 @@ outputs/basic/module/module2_satellite_position_summary.txt
 模块三输出两个文件：
 
 ```text
-outputs/basic/module/module3_pseudorange_single_epoch.csv
-outputs/basic/module/module3_spp_result_single_epoch.txt
+outputs/basic/<nav文件名>/module3_单历元伪距.csv
+outputs/basic/<nav文件名>/module3_单历元定位结果.txt
 ```
 
-`module3_pseudorange_single_epoch.csv` 表示伪距明细，字段含义：
+`module3_单历元伪距.csv` 表示伪距明细，字段含义：
 
 - `epoch_time`：历元时间；
 - `sat_id`：卫星编号；
@@ -269,7 +269,7 @@ outputs/basic/module/module3_spp_result_single_epoch.txt
 - `raw_simulated_pseudorange`：包含卫星钟差、传播延迟和噪声的原始模拟伪距；
 - `simulated_pseudorange`：应用卫星钟差、电离层和对流层改正后的伪距，也是 SPP 解算实际使用的伪距。
 
-`module3_spp_result_single_epoch.txt` 表示单历元 SPP 报告，字段含义：
+`module3_单历元定位结果.txt` 表示单历元 SPP 报告，字段含义：
 
 - `测试历元时间`：本次单历元解算时间；
 - `参与定位的卫星数量`：进入 SPP 解算的健康卫星数量；
@@ -330,14 +330,14 @@ outputs/basic/module/module3_spp_result_single_epoch.txt
 模块四输出：
 
 ```text
-outputs/basic/module/module4_continuous_position_results.csv
-outputs/basic/module/module4_error_statistics.txt
-outputs/basic/module/module4_error_curve.png
-outputs/basic/module/module4_trajectory.png
-outputs/basic/module/module4_satellite_dop_curve.png
+outputs/basic/<nav文件名>/module4_连续定位结果.csv
+outputs/basic/<nav文件名>/module4_误差统计.txt
+outputs/basic/<nav文件名>/module4_误差曲线.png
+outputs/basic/<nav文件名>/module4_轨迹图.png
+outputs/basic/<nav文件名>/module4_卫星DOP曲线.png
 ```
 
-`module4_continuous_position_results.csv` 字段含义：
+`module4_连续定位结果.csv` 字段含义：
 
 - `epoch_time`：历元时间；
 - `status`：该历元解算状态；
@@ -365,9 +365,9 @@ outputs/basic/module/module4_satellite_dop_curve.png
 
 三张图片含义：
 
-- `module4_error_curve.png`：三维误差随历元变化曲线；
-- `module4_trajectory.png`：解算轨迹与真实位置对比；
-- `module4_satellite_dop_curve.png`：可用卫星数量、PDOP、GDOP 随历元变化。
+- `module4_误差曲线.png`：三维误差随历元变化曲线；
+- `module4_轨迹图.png`：解算轨迹与真实位置对比；
+- `module4_卫星DOP曲线.png`：可用卫星数量、PDOP、GDOP 随历元变化。
 
 ### 6.5 对应题目基础要求
 
@@ -416,7 +416,7 @@ outputs/basic/module/module4_satellite_dop_curve.png
 模块五输出：
 
 ```text
-outputs/basic/module/module5_system_test_report.txt
+outputs/basic/<nav文件名>/module5_系统测试报告.txt
 ```
 
 该报告汇总：
@@ -656,11 +656,11 @@ GUI 右侧主要有三个页签。
 GUI 运行后主要写入模块四输出：
 
 ```text
-outputs/basic/module/module4_continuous_position_results.csv
-outputs/basic/module/module4_error_statistics.txt
-outputs/basic/module/module4_error_curve.png
-outputs/basic/module/module4_trajectory.png
-outputs/basic/module/module4_satellite_dop_curve.png
+outputs/basic/<nav文件名>/module4_连续定位结果.csv
+outputs/basic/<nav文件名>/module4_误差统计.txt
+outputs/basic/<nav文件名>/module4_误差曲线.png
+outputs/basic/<nav文件名>/module4_轨迹图.png
+outputs/basic/<nav文件名>/module4_卫星DOP曲线.png
 ```
 
 这些文件与命令行模块四输出一致。
@@ -669,17 +669,17 @@ outputs/basic/module/module4_satellite_dop_curve.png
 
 ```text
 outputs/basic/module/module1_nav_parse_summary.txt
-outputs/basic/module/module1_ephemeris_list.csv
-outputs/basic/module/module2_satellite_position_clock.csv
-outputs/basic/module/module2_satellite_position_summary.txt
-outputs/basic/module/module3_pseudorange_single_epoch.csv
-outputs/basic/module/module3_spp_result_single_epoch.txt
-outputs/basic/module/module4_continuous_position_results.csv
-outputs/basic/module/module4_error_statistics.txt
-outputs/basic/module/module4_error_curve.png
-outputs/basic/module/module4_trajectory.png
-outputs/basic/module/module4_satellite_dop_curve.png
-outputs/basic/module/module5_system_test_report.txt
+outputs/basic/<nav文件名>/module1_星历列表.csv
+outputs/basic/<nav文件名>/module2_卫星位置与钟差.csv
+outputs/basic/<nav文件名>/module2_卫星位置汇总.txt
+outputs/basic/<nav文件名>/module3_单历元伪距.csv
+outputs/basic/<nav文件名>/module3_单历元定位结果.txt
+outputs/basic/<nav文件名>/module4_连续定位结果.csv
+outputs/basic/<nav文件名>/module4_误差统计.txt
+outputs/basic/<nav文件名>/module4_误差曲线.png
+outputs/basic/<nav文件名>/module4_轨迹图.png
+outputs/basic/<nav文件名>/module4_卫星DOP曲线.png
+outputs/basic/<nav文件名>/module5_系统测试报告.txt
 ```
 
 ## 9. 常见注意事项

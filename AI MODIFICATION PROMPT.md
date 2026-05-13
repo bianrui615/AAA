@@ -179,8 +179,8 @@ def apply_pseudorange_corrections(
 
 ### 验收标准
 
-- `python basic/module5.py` 跑完后，`outputs/basic/module4_error_statistics.txt` 里 **RMS 三维误差应该 < 15 m**（理想 < 5 m）
-- `outputs/basic/module4_continuous_position_results.csv` 里新增 3 列：`sat_clock_correction_m`、`tropo_correction_m`、`iono_correction_m`（取所有卫星的均值即可）
+- `python basic/module5.py` 跑完后，`outputs/basic/module4_误差统计.txt` 里 **RMS 三维误差应该 < 15 m**（理想 < 5 m）
+- `outputs/basic/module4_连续定位结果.csv` 里新增 3 列：`sat_clock_correction_m`、`tropo_correction_m`、`iono_correction_m`（取所有卫星的均值即可）
 - 单元测试：在 `tests/test_corrections.py` 里加 3 个最小测试：高度角 90° 时对流层 ≈ 2.3 m，高度角 30° 时 ≈ 4.6 m，电离层在 90° 时 = 10 m。
 
 -----
@@ -195,7 +195,7 @@ def apply_pseudorange_corrections(
 
 #### 2.1 在 `basic/module4.py` 的 `plot_results` 中追加新图
 
-新增一张图 `module4_dop_error_analysis.png`，包含 4 个子图（2×2 布局）：
+新增一张图 `module4_DOP与误差分析.png`，包含 4 个子图（2×2 布局）：
 
 1. 左上：PDOP vs error_3d 散点图 + 线性拟合直线 + 标注相关系数 r
 1. 右上：GDOP vs error_3d 散点图 + 线性拟合 + r
@@ -244,13 +244,13 @@ def _plot_dop_error_analysis(results, output_path):
     # 子图 4：误差直方图 hist
 
     plt.tight_layout()
-    plt.savefig(output_path / "module4_dop_error_analysis.png", dpi=160)
+    plt.savefig(output_path / "module4_DOP与误差分析.png", dpi=160)
     plt.close()
     
     return {"r_pdop_error": r_pdop, "r_gdop_error": r_gdop, "r_count_error": r_count}
 ```
 
-#### 2.2 把相关系数写入 `module4_error_statistics.txt`
+#### 2.2 把相关系数写入 `module4_误差统计.txt`
 
 在 `save_error_statistics` 函数里追加：
 
@@ -269,8 +269,8 @@ PDOP 与误差正相关（卫星几何越差，定位精度越低），符合理
 
 ### 验收标准
 
-- `outputs/basic/module4_dop_error_analysis.png` 文件生成且包含 4 个子图
-- `module4_error_statistics.txt` 里有相关系数和定性结论
+- `outputs/basic/module4_DOP与误差分析.png` 文件生成且包含 4 个子图
+- `module4_误差统计.txt` 里有相关系数和定性结论
 - GUI 误差曲线 Tab 旁边增加一个 “DOP 分析” Tab，显示这张图（可选）
 
 -----
@@ -360,8 +360,8 @@ def train_models(dataset_path, test_size=0.3, random_state=2026,
 
 ### 验收标准
 
-- `outputs/enhance/ml_dataset.csv` 行数 >= 500
-- `outputs/enhance/ml_compensation_statistics.txt` 中**随机森林**的 RMS 改善 > 30%（任务 1 修正完成后，再做 ML 补偿应该更有效）
+- `outputs/enhance/ml/机器学习数据集.csv` 行数 >= 500
+- `outputs/enhance/ml/补偿效果统计.txt` 中**随机森林**的 RMS 改善 > 30%（任务 1 修正完成后，再做 ML 补偿应该更有效）
 - 训练时间不超过 2 分钟
 
 -----
@@ -703,7 +703,7 @@ python enhance/run_enhance.py
 确保 `outputs/basic/` 和 `outputs/enhance/` 下的所有 PNG 都存在，然后在报告 Markdown 里用相对路径引用：
 
 ```markdown
-![模块四误差曲线](../outputs/basic/module4_error_curve.png)
+![模块四误差曲线](../outputs/basic/module4_误差曲线.png)
 ```
 
 ### 验收标准
