@@ -717,7 +717,7 @@ if __name__ == "__main__":
     MAX_ITERATIONS = 12
     CONVERGENCE_THRESHOLD = 1e-2
     ELEVATION_MASK_DEG = 0.0
-    OUTPUT_DIR = "outputs/basic"
+    OUTPUT_DIR = "outputs/basic/module"
 
     try:
         nav_data, parse_info = parse_nav_file(NAV_FILE_PATH)

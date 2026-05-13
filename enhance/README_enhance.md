@@ -35,7 +35,7 @@ python enhance/run_enhance.py
 该命令会自动完成：
 1. 创建 `outputs/enhance/` 目录结构；
 2. 构建至少 3 个不同场景并生成连续定位结果；
-3. 构建 `ml_dataset.csv`；
+3. 构建 `ml/ml_dataset.csv`；
 4. 划分训练集（70%）与测试集（30%）；
 5. 训练 `LinearRegression`；
 6. 训练 `RandomForestRegressor`；
@@ -50,22 +50,22 @@ python enhance/run_enhance.py
 
 | 文件/目录 | 说明 |
 |-----------|------|
-| `scenarios/scenario_1/...` | 场景 1 连续定位结果 |
-| `scenarios/scenario_2/...` | 场景 2 连续定位结果 |
-| `scenarios/scenario_3/...` | 场景 3 连续定位结果 |
-| `ml_dataset.csv` | 机器学习数据集（特征 + 标签） |
+| `ml/scenarios/scenario_1/...` | 场景 1 连续定位结果 |
+| `ml/scenarios/scenario_2/...` | 场景 2 连续定位结果 |
+| `ml/scenarios/scenario_3/...` | 场景 3 连续定位结果 |
+| `ml/ml_dataset.csv` | 机器学习数据集（特征 + 标签） |
 | `models/linear_regression_model.joblib` | 线性回归模型文件 |
 | `models/random_forest_model.joblib` | 随机森林模型文件 |
-| `train_test_split_summary.txt` | 训练/测试集划分摘要 |
-| `predictions/linear_regression_predictions.csv` | 线性回归补偿预测结果 |
-| `predictions/random_forest_predictions.csv` | 随机森林补偿预测结果 |
-| `model_comparison_summary.csv` | 模型对比指标 CSV |
-| `ml_compensation_statistics.txt` | 中文补偿统计报告 |
+| `ml/train_test_split_summary.txt` | 训练/测试集划分摘要 |
+| `ml/predictions/linear_regression_predictions.csv` | 线性回归补偿预测结果 |
+| `ml/predictions/random_forest_predictions.csv` | 随机森林补偿预测结果 |
+| `ml/model_comparison_summary.csv` | 模型对比指标 CSV |
+| `ml/ml_compensation_statistics.txt` | 中文补偿统计报告 |
 | `figures/error_curve_linear_regression.png` | 线性回归补偿前后误差曲线 |
 | `figures/error_curve_random_forest.png` | 随机森林补偿前后误差曲线 |
 | `figures/model_comparison_bar.png` | 模型对比柱状图 |
 | `figures/predicted_vs_true_error.png` | 预测误差 vs 真实误差散点图 |
-| `ml_technical_report.txt` | 技术报告 |
+| `ml/ml_technical_report.txt` | 技术报告 |
 
 ## 设计要点
 

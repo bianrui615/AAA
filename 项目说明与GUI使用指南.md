@@ -90,8 +90,8 @@ tarc0910.26b
 模块一输出两个文件：
 
 ```text
-outputs/basic/module1_nav_parse_summary.txt
-outputs/basic/module1_ephemeris_list.csv
+outputs/basic/module/module1_nav_parse_summary.txt
+outputs/basic/module/module1_ephemeris_list.csv
 ```
 
 `module1_nav_parse_summary.txt` 表示解析摘要，主要字段含义：
@@ -164,8 +164,8 @@ outputs/basic/module1_ephemeris_list.csv
 模块二输出两个文件：
 
 ```text
-outputs/basic/module2_satellite_position_clock.csv
-outputs/basic/module2_satellite_position_summary.txt
+outputs/basic/module/module2_satellite_position_clock.csv
+outputs/basic/module/module2_satellite_position_summary.txt
 ```
 
 `module2_satellite_position_clock.csv` 表示每颗卫星在测试历元的计算结果，字段含义：
@@ -246,8 +246,8 @@ outputs/basic/module2_satellite_position_summary.txt
 模块三输出两个文件：
 
 ```text
-outputs/basic/module3_pseudorange_single_epoch.csv
-outputs/basic/module3_spp_result_single_epoch.txt
+outputs/basic/module/module3_pseudorange_single_epoch.csv
+outputs/basic/module/module3_spp_result_single_epoch.txt
 ```
 
 `module3_pseudorange_single_epoch.csv` 表示伪距明细，字段含义：
@@ -330,11 +330,11 @@ outputs/basic/module3_spp_result_single_epoch.txt
 模块四输出：
 
 ```text
-outputs/basic/module4_continuous_position_results.csv
-outputs/basic/module4_error_statistics.txt
-outputs/basic/module4_error_curve.png
-outputs/basic/module4_trajectory.png
-outputs/basic/module4_satellite_dop_curve.png
+outputs/basic/module/module4_continuous_position_results.csv
+outputs/basic/module/module4_error_statistics.txt
+outputs/basic/module/module4_error_curve.png
+outputs/basic/module/module4_trajectory.png
+outputs/basic/module/module4_satellite_dop_curve.png
 ```
 
 `module4_continuous_position_results.csv` 字段含义：
@@ -416,7 +416,7 @@ outputs/basic/module4_satellite_dop_curve.png
 模块五输出：
 
 ```text
-outputs/basic/module5_system_test_report.txt
+outputs/basic/module/module5_system_test_report.txt
 ```
 
 该报告汇总：
@@ -656,11 +656,11 @@ GUI 右侧主要有三个页签。
 GUI 运行后主要写入模块四输出：
 
 ```text
-outputs/basic/module4_continuous_position_results.csv
-outputs/basic/module4_error_statistics.txt
-outputs/basic/module4_error_curve.png
-outputs/basic/module4_trajectory.png
-outputs/basic/module4_satellite_dop_curve.png
+outputs/basic/module/module4_continuous_position_results.csv
+outputs/basic/module/module4_error_statistics.txt
+outputs/basic/module/module4_error_curve.png
+outputs/basic/module/module4_trajectory.png
+outputs/basic/module/module4_satellite_dop_curve.png
 ```
 
 这些文件与命令行模块四输出一致。
@@ -668,18 +668,18 @@ outputs/basic/module4_satellite_dop_curve.png
 如果运行过 `module5_main_system_test.py`，还会有完整五模块输出：
 
 ```text
-outputs/basic/module1_nav_parse_summary.txt
-outputs/basic/module1_ephemeris_list.csv
-outputs/basic/module2_satellite_position_clock.csv
-outputs/basic/module2_satellite_position_summary.txt
-outputs/basic/module3_pseudorange_single_epoch.csv
-outputs/basic/module3_spp_result_single_epoch.txt
-outputs/basic/module4_continuous_position_results.csv
-outputs/basic/module4_error_statistics.txt
-outputs/basic/module4_error_curve.png
-outputs/basic/module4_trajectory.png
-outputs/basic/module4_satellite_dop_curve.png
-outputs/basic/module5_system_test_report.txt
+outputs/basic/module/module1_nav_parse_summary.txt
+outputs/basic/module/module1_ephemeris_list.csv
+outputs/basic/module/module2_satellite_position_clock.csv
+outputs/basic/module/module2_satellite_position_summary.txt
+outputs/basic/module/module3_pseudorange_single_epoch.csv
+outputs/basic/module/module3_spp_result_single_epoch.txt
+outputs/basic/module/module4_continuous_position_results.csv
+outputs/basic/module/module4_error_statistics.txt
+outputs/basic/module/module4_error_curve.png
+outputs/basic/module/module4_trajectory.png
+outputs/basic/module/module4_satellite_dop_curve.png
+outputs/basic/module/module5_system_test_report.txt
 ```
 
 ## 9. 常见注意事项

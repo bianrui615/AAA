@@ -167,7 +167,7 @@ def run_continuous_positioning(
     end_time: datetime,
     interval_seconds: int,
     receiver_true_position: ECEF,
-    output_dir: str | Path = "outputs/basic",
+    output_dir: str | Path = "outputs/basic/module",
     random_seed: Optional[int] = 2026,
     max_iter: int = 10,
     convergence_threshold: float = 1e-2,
@@ -720,7 +720,7 @@ if __name__ == "__main__":
     _start_time = datetime(2026, 4, 1, 0, 0, 0)
     _end_time = datetime(2026, 4, 1, 1, 0, 0)
     _interval = 300
-    _output_dir = "outputs/basic"
+    _output_dir = "outputs/basic/module"
 
     print(f"[module4] 正在解析 NAV 文件: {_nav_path}")
     nav_data, parse_info = parse_nav_file(_nav_path)

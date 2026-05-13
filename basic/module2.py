@@ -365,15 +365,15 @@ if __name__ == "__main__":
 
     # 1. 计算卫星位置与钟差，输出原有 CSV 和摘要
     rows = calculate_all_satellite_positions(nav, test_epoch)
-    paths = save_satellite_position_outputs(rows, "outputs/basic", test_epoch)
+    paths = save_satellite_position_outputs(rows, "outputs/basic/module", test_epoch)
     print(f"module2_satellite_position_clock.csv and summary saved.")
 
     # 2. 输出 module2_satellite_debug.csv（中间调试变量）
     debug_rows = calculate_satellite_debug_data(nav, test_epoch)
-    debug_path = save_satellite_debug_csv(debug_rows, "outputs/basic")
+    debug_path = save_satellite_debug_csv(debug_rows, "outputs/basic/module")
     print(f"module2_satellite_debug.csv saved: {debug_path}")
 
     # 3. 输出 module2_pseudorange_correction_debug.csv（伪距修正调试文件）
     debug_rows = generate_pseudorange_correction_debug_records(nav, test_epoch, receiver_approx, rng=rng)
-    debug_path = save_pseudorange_correction_debug_csv(debug_rows, "outputs/basic")
+    debug_path = save_pseudorange_correction_debug_csv(debug_rows, "outputs/basic/module")
     print(f"module2_pseudorange_correction_debug.csv saved: {debug_path}")

@@ -30,12 +30,14 @@ class ScenarioConfig:
     elevation_mask_deg: float = 0.0
 
 
-# 输出目录统一放在 outputs/enhance/，避免与基础部分 outputs/basic/ 混淆
-BASE_OUTPUT_DIR = Path("outputs/enhance")
-SCENARIO_OUTPUT_DIR = BASE_OUTPUT_DIR / "scenarios"
-MODEL_OUTPUT_DIR = BASE_OUTPUT_DIR / "models"
-PREDICTION_OUTPUT_DIR = BASE_OUTPUT_DIR / "predictions"
-FIGURE_OUTPUT_DIR = BASE_OUTPUT_DIR / "figures"
+# 输出目录统一放在 outputs/enhance/，txt/csv 类机器学习结果集中放在 ml/ 下。
+ENHANCE_OUTPUT_ROOT = Path("outputs/enhance")
+ML_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "ml"
+BASE_OUTPUT_DIR = ML_OUTPUT_DIR
+SCENARIO_OUTPUT_DIR = ML_OUTPUT_DIR / "scenarios"
+MODEL_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "models"
+PREDICTION_OUTPUT_DIR = ML_OUTPUT_DIR / "predictions"
+FIGURE_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "figures"
 
 # 3 个不同场景，每场景 2 小时 × 30 秒采样 = 241 历元，总计约 720 样本
 SCENARIOS: List[ScenarioConfig] = [

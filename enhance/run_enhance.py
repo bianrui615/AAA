@@ -33,7 +33,7 @@ if str(_project_root) not in sys.path:
 
 from enhance.compensate import run_compensation
 from enhance.dataset_builder import build_dataset
-from enhance.enhance_config import BASE_OUTPUT_DIR, FEATURE_COLUMNS
+from enhance.enhance_config import BASE_OUTPUT_DIR, FEATURE_COLUMNS, FIGURE_OUTPUT_DIR
 from enhance.evaluate_models import evaluate_and_visualize
 from enhance.train_models import train_models
 
@@ -158,7 +158,7 @@ def write_technical_report(
                     "线性回归补偿后 RMS 误差更低，整体效果优于随机森林。\n"
                 )
         f.write(
-            "详细统计请参见 outputs/enhance/ml_compensation_statistics.txt\n\n"
+            "详细统计请参见 outputs/enhance/ml/ml_compensation_statistics.txt\n\n"
         )
 
         f.write("13. 优势、不足和改进方向\n")
@@ -289,10 +289,10 @@ def main() -> int:
         prediction_paths["random_forest"],
         eval_paths["summary_csv"],
         eval_paths["stats_txt"],
-        BASE_OUTPUT_DIR / "figures" / "error_curve_linear_regression.png",
-        BASE_OUTPUT_DIR / "figures" / "error_curve_random_forest.png",
-        BASE_OUTPUT_DIR / "figures" / "model_comparison_bar.png",
-        BASE_OUTPUT_DIR / "figures" / "predicted_vs_true_error.png",
+        FIGURE_OUTPUT_DIR / "error_curve_linear_regression.png",
+        FIGURE_OUTPUT_DIR / "error_curve_random_forest.png",
+        FIGURE_OUTPUT_DIR / "model_comparison_bar.png",
+        FIGURE_OUTPUT_DIR / "predicted_vs_true_error.png",
         report_path,
     ]
     for fp in files:

@@ -1,6 +1,6 @@
 ﻿机器学习数据集划分摘要
 ========================================
-数据集文件：outputs\enhance\ml_dataset.csv
+数据集文件：outputs\enhance\ml\ml_dataset.csv
 总样本数：723
 训练集样本数：506
 测试集样本数：217

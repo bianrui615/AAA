@@ -74,7 +74,7 @@ compensated_z = spp_z + pred_error_z
 12. 两个模型结果对比
 ----------------------------------------
 线性回归补偿后 RMS 误差更低，整体效果优于随机森林。
-详细统计请参见 outputs/enhance/ml_compensation_statistics.txt
+详细统计请参见 outputs/enhance/ml/ml_compensation_statistics.txt
 
 13. 优势、不足和改进方向
 ----------------------------------------

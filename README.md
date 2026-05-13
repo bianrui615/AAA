@@ -96,31 +96,31 @@ python enhance/run_enhance.py
 
 ## 基础部分输出文件
 
-运行 `python basic/module5.py` 后，输出统一存放在 `outputs/basic/`：
+运行 `python basic/module5.py` 后，输出统一存放在 `outputs/basic/module/`：
 
 **模块一**
-- `outputs/basic/module1_parsed_nav_debug.csv` — 星历解析调试数据
-- `outputs/basic/module1_simulated_pseudorange.csv` — 模拟伪距明细
-- `outputs/basic/module1_nav_parse_summary.txt` — 解析摘要
+- `outputs/basic/module/module1_parsed_nav_debug.csv` — 星历解析调试数据
+- `outputs/basic/module/module1_simulated_pseudorange.csv` — 模拟伪距明细
+- `outputs/basic/module/module1_nav_parse_summary.txt` — 解析摘要
 
 **模块二**
-- `outputs/basic/module2_satellite_position_clock.csv` — 卫星位置与钟差
-- `outputs/basic/module2_satellite_position_summary.txt` — 计算摘要
-- `outputs/basic/module2_pseudorange_correction_debug.csv` — 伪距修正调试文件（仅用于展示 rho、卫星钟差、各项误差与模拟伪距之间的关系，**不参与 SPP 解算**）
+- `outputs/basic/module/module2_satellite_position_clock.csv` — 卫星位置与钟差
+- `outputs/basic/module/module2_satellite_position_summary.txt` — 计算摘要
+- `outputs/basic/module/module2_pseudorange_correction_debug.csv` — 伪距修正调试文件（仅用于展示 rho、卫星钟差、各项误差与模拟伪距之间的关系，**不参与 SPP 解算**）
 
 **模块三**
-- `outputs/basic/module3_pseudorange_single_epoch.csv` — 单历元伪距明细
-- `outputs/basic/module3_spp_result_single_epoch.txt` — 单历元 SPP 解算报告
+- `outputs/basic/module/module3_pseudorange_single_epoch.csv` — 单历元伪距明细
+- `outputs/basic/module/module3_spp_result_single_epoch.txt` — 单历元 SPP 解算报告
 
 **模块四**
-- `outputs/basic/module4_continuous_position_results.csv` — 连续定位结果
-- `outputs/basic/module4_error_statistics.txt` — 误差统计
-- `outputs/basic/module4_error_curve.png` — 误差曲线
-- `outputs/basic/module4_trajectory.png` — 经纬度轨迹图
-- `outputs/basic/module4_satellite_dop_curve.png` — 卫星数与 DOP 曲线
+- `outputs/basic/module/module4_continuous_position_results.csv` — 连续定位结果
+- `outputs/basic/module/module4_error_statistics.txt` — 误差统计
+- `outputs/basic/module/module4_error_curve.png` — 误差曲线
+- `outputs/basic/module/module4_trajectory.png` — 经纬度轨迹图
+- `outputs/basic/module/module4_satellite_dop_curve.png` — 卫星数与 DOP 曲线
 
 **模块五**
-- `outputs/basic/module5_system_test_report.txt` — 系统整合与测试报告
+- `outputs/basic/module/module5_system_test_report.txt` — 系统整合与测试报告
 
 此外，三场景 GUI 批量解算（`python basic/gui_scenario_runner.py`）会输出：
 - `outputs/basic/gui_scenario_runner/gui_three_scenario_summary.csv`
@@ -131,20 +131,20 @@ python enhance/run_enhance.py
 
 ## 提高部分输出文件
 
-运行 `python enhance/run_enhance.py` 后，输出统一存放在 `outputs/enhance/`：
+运行 `python enhance/run_enhance.py` 后，输出统一存放在 `outputs/enhance/`，其中 txt/csv 结果位于 `outputs/enhance/ml/`：
 
-- `ml_dataset.csv` — 机器学习数据集
+- `ml/ml_dataset.csv` — 机器学习数据集
 - `models/linear_regression_model.joblib` — 线性回归模型
 - `models/random_forest_model.joblib` — 随机森林模型
-- `predictions/linear_regression_predictions.csv` — 线性回归补偿结果
-- `predictions/random_forest_predictions.csv` — 随机森林补偿结果
-- `model_comparison_summary.csv` — 模型对比指标
-- `ml_compensation_statistics.txt` — 补偿统计报告
+- `ml/predictions/linear_regression_predictions.csv` — 线性回归补偿结果
+- `ml/predictions/random_forest_predictions.csv` — 随机森林补偿结果
+- `ml/model_comparison_summary.csv` — 模型对比指标
+- `ml/ml_compensation_statistics.txt` — 补偿统计报告
 - `figures/error_curve_linear_regression.png` — 误差曲线
 - `figures/error_curve_random_forest.png` — 误差曲线
 - `figures/model_comparison_bar.png` — 模型对比柱状图
 - `figures/predicted_vs_true_error.png` — 预测误差散点图
-- `ml_technical_report.txt` — 技术报告
+- `ml/ml_technical_report.txt` — 技术报告
 
 ## 导航文件
 

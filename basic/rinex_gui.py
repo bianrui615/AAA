@@ -1139,7 +1139,7 @@ if QT_IMPORT_ERROR is None:
             self._refresh_error_plot()
             self._refresh_playback_controls()
             self.update_playback_plot(self.play_slider.value())
-            self.log("解算完成，CSV、统计文件和结果图已写入 outputs/basic 目录。")
+            self.log(f"解算完成，CSV、统计文件和结果图已写入 {OUTPUT_DIR} 目录。")
             QMessageBox.information(self, "完成", "连续定位解算完成。")
 
         def positioning_failed(self, message: str) -> None:
@@ -1174,7 +1174,7 @@ if QT_IMPORT_ERROR is None:
         def export_outputs(self) -> None:
             source_dir = Path(OUTPUT_DIR)
             if not source_dir.exists():
-                QMessageBox.warning(self, "缺少输出", "当前还没有可导出的 outputs/basic 目录。")
+                QMessageBox.warning(self, "缺少输出", f"当前还没有可导出的 {OUTPUT_DIR} 目录。")
                 return
             target_name = QFileDialog.getExistingDirectory(
                 self,
