@@ -184,6 +184,10 @@ def write_system_test_report(
                 f"Z={RECEIVER_TRUE_POSITION[2]:.4f} m\n"
             )
 
+        file.write("坐标用途说明：\n")
+        file.write("  - 真实坐标（true position）仅用于模拟伪距生成和三维定位误差评估（标准参考值）；\n")
+        file.write("  - 初始概略坐标（initial approx position）用于 SPP 迭代最小二乘的迭代初值，\n")
+        file.write("    与真实坐标存在人为偏差，更符合实际工程中\"先验概略坐标\"的应用场景。\n")
         file.write(f"仿真起始时间：{SIMULATION_START_TIME.isoformat(sep=' ')}\n")
         file.write(f"仿真结束时间：{SIMULATION_END_TIME.isoformat(sep=' ')}\n")
         file.write("时间系统说明：用户设置的仿真起止时间与导航文件中的 toc/toe 统一按 BDT（北斗时）理解。当前不做 UTC/GPST/BDT 转换。\n")
@@ -321,12 +325,16 @@ def main() -> int:
         single_solution = solve_spp(
             satellite_positions,
             pseudoranges,
-            initial_position=RECEIVER_TRUE_POSITION,
+            # 注意：此处使用概略坐标作为迭代初值，而非真实坐标。
+            # 真实坐标（RECEIVER_TRUE_POSITION）仅用于模拟伪距生成和误差评估，
+            # 不直接参与 SPP 迭代过程，符合实际工程应用中"先验概略位置"的用法。
+            initial_position=RECEIVER_INITIAL_APPROX_POSITION,
             max_iter=MAX_ITERATIONS,
             convergence_threshold=CONVERGENCE_THRESHOLD,
             satellite_health=satellite_health,
             elevation_mask_deg=ELEVATION_MASK_DEG,
             enable_pseudorange_outlier_filter=False,
+            apply_corrections=False,
         )
         module3_paths = save_single_epoch_spp_outputs(
             pseudo_records,

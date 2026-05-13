@@ -65,8 +65,11 @@ def write_technical_report(
         f.write("-" * 40 + "\n")
         f.write(
             "数据由 enhance/dataset_builder.py 调用 basic/ 模块生成。\n"
-            "使用 nav/tarc0910.26b_cnav 作为 BDS-3 CNAV 导航文件，\n"
-            "基于广播星历和伪距模拟模型产生定位结果。\n\n"
+            "使用 enhance/enhance_config.py 中定义的 3 个不同 BDS-3 CNAV 导航文件：\n"
+            "  场景 1：nav/tarc0910.26b_cnav（北京区域，2026-04-01）\n"
+            "  场景 2：nav/tarc1210.26b_cnav（上海区域，2026-05-01）\n"
+            "  场景 3：nav/tarc1230.26b_cnav（广州区域，2026-05-03，含高度角截止）\n"
+            "各场景独立随机种子，基于广播星历和模拟伪距误差模型产生定位结果。\n\n"
         )
 
         f.write("3. 为什么不用 .obs 文件\n")
@@ -125,9 +128,14 @@ def write_technical_report(
         f.write("9. 训练集/测试集划分\n")
         f.write("-" * 40 + "\n")
         f.write(f"总样本数：{n_total}\n")
-        f.write(f"训练集：{n_train}（70%）\n")
-        f.write(f"测试集：{n_test}（30%）\n")
-        f.write("划分方式：sklearn.train_test_split，random_state=2026\n\n")
+        f.write(f"训练集：{n_train}（约 70%）\n")
+        f.write(f"测试集：{n_test}（约 30%）\n")
+        f.write(
+            "划分方式：按 scenario_name 整场景划分（scenario-based split）。\n"
+            "每个场景的所有历元要么全部进入训练集，要么全部进入测试集，\n"
+            "避免同一场景相邻历元同时出现在训练集和测试集中导致数据泄漏。\n"
+            "random_state=2026\n\n"
+        )
 
         f.write("10. 补偿公式\n")
         f.write("-" * 40 + "\n")
@@ -174,7 +182,22 @@ def write_technical_report(
             "改进方向：\n"
             "  - 引入真实观测数据验证；\n"
             "  - 尝试 XGBoost、LightGBM、神经网络等更复杂模型；\n"
-            "  - 利用时序特征或滑动窗口提升预测稳定性。\n"
+            "  - 利用时序特征或滑动窗口提升预测稳定性。\n\n"
+        )
+        f.write("14. 当前版本局限性说明\n")
+        f.write("-" * 40 + "\n")
+        f.write(
+            "当前提高部分完全基于模拟伪距（BDS-3 CNAV 广播星历 + 伪距误差模型），\n"
+            "所有定位数据均为仿真生成，未使用真实 RINEX OBS 观测文件。\n"
+            "主要局限：\n"
+            "  - 模拟误差模型（SISRE、电离层、对流层、接收机钟差、噪声）与真实\n"
+            "    观测环境存在差异，机器学习模型在真实场景下的补偿效果有待验证；\n"
+            "  - 多路径效应、信号遮挡等复杂环境干扰未在当前模型中体现。\n"
+            "后续扩展：\n"
+            "  - 基础模块（module4.py）已通过 pseudorange_source 参数预留 OBS\n"
+            "    观测伪距接口，后续可在不修改主流程的前提下接入真实观测数据；\n"
+            "  - 接入真实 OBS 后，可重新训练机器学习模型，验证补偿方法在实测\n"
+            "    数据上的泛化能力。\n"
         )
 
 

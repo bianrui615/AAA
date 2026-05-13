@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import math
+import random
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -17,7 +18,7 @@ import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV
 
 from enhance.enhance_config import (
     BASE_OUTPUT_DIR,
@@ -49,6 +50,46 @@ def load_dataset(dataset_path: Path) -> Tuple[List[dict], np.ndarray, np.ndarray
     return rows, X, y
 
 
+def _scenario_based_split(
+    rows: List[dict],
+    X: np.ndarray,
+    y: np.ndarray,
+    test_ratio: float = 0.3,
+    random_state: int = 2026,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """按 scenario_name 整场景划分训练集与测试集。
+
+    将场景列表随机打乱后按 test_ratio 分配：整个场景要么全部进训练集，
+    要么全部进测试集，避免同一场景的相邻历元同时出现在训练和测试中。
+
+    返回: (X_train, X_test, y_train, y_test, idx_train, idx_test)
+    """
+    scenario_names = sorted(set(row.get("scenario_name", "") for row in rows))
+    n_scenarios = len(scenario_names)
+
+    rng = random.Random(random_state)
+    shuffled = list(scenario_names)
+    rng.shuffle(shuffled)
+
+    n_test_scenarios = max(1, round(n_scenarios * test_ratio))
+    test_set = set(shuffled[:n_test_scenarios])
+
+    idx_train = np.array([i for i, r in enumerate(rows) if r.get("scenario_name", "") not in test_set])
+    idx_test = np.array([i for i, r in enumerate(rows) if r.get("scenario_name", "") in test_set])
+
+    if len(idx_train) == 0 or len(idx_test) == 0:
+        raise RuntimeError(
+            "场景划分后训练集或测试集为空，请检查场景数量是否足够（至少 2 个场景）。"
+        )
+
+    train_scenarios = [s for s in shuffled if s not in test_set]
+    print(
+        f"[train_models] 场景划分：训练场景 {train_scenarios}，"
+        f"测试场景 {sorted(test_set)}"
+    )
+    return X[idx_train], X[idx_test], y[idx_train], y[idx_test], idx_train, idx_test
+
+
 def train_models(
     dataset_path: Path,
     test_size: float = 0.3,
@@ -59,7 +100,7 @@ def train_models(
 
     参数:
         dataset_path: ml_dataset.csv 路径
-        test_size: 测试集比例，默认 0.3
+        test_size: 测试集比例，默认 0.3（按场景整体划分，非随机样本划分）
         random_state: 随机种子
         enable_grid_search: 是否启用 GridSearchCV 调优随机森林超参数（默认关闭）
     """
@@ -70,10 +111,9 @@ def train_models(
     if n_samples < 10:
         raise RuntimeError(f"数据集样本数过少（{n_samples}），无法训练模型。")
 
-    # 划分训练集与测试集，同时保留索引以便提取测试集元数据
-    indices = np.arange(n_samples)
-    X_train, X_test, y_train, y_test, idx_train, idx_test = train_test_split(
-        X, y, indices, test_size=test_size, random_state=random_state
+    # 按 scenario_name 整场景划分，避免同场景相邻历元同时进入训练集和测试集
+    X_train, X_test, y_train, y_test, idx_train, idx_test = _scenario_based_split(
+        rows, X, y, test_ratio=test_size, random_state=random_state
     )
 
     # 提取测试集元数据（用于后续补偿）
@@ -145,7 +185,8 @@ def train_models(
         f.write(f"测试集样本数：{X_test.shape[0]}\n")
         f.write(f"特征数量：{len(FEATURE_COLUMNS)}\n")
         f.write(f"标签数量：{len(LABEL_COLUMNS)} (error_x, error_y, error_z)\n")
-        f.write(f"测试集比例：{test_size * 100:.0f}%\n")
+        f.write(f"测试集比例（按场景）：约 {test_size * 100:.0f}%\n")
+        f.write(f"划分方式：按 scenario_name 整场景划分，避免同场景相邻历元数据泄漏\n")
         f.write(f"划分随机种子：{random_state}\n")
         f.write(f"特征列表：{', '.join(FEATURE_COLUMNS)}\n")
 

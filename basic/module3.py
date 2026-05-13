@@ -109,6 +109,9 @@ def apply_pseudorange_corrections(
 ) -> Tuple[float, dict]:
     """对单颗卫星的伪距进行确定性修正。
 
+    注意：本函数保留供未来 OBS 真实观测模式或调试扩展使用。
+    当前模拟伪距主流程中 apply_corrections=False（默认），不调用此函数。
+
     P_corrected = P_raw + c·dt_sat - T_iono - T_tropo
 
     参数:
@@ -453,16 +456,25 @@ def solve_spp(
     satellite_health: Optional[Dict[str, float]] = None,
     elevation_mask_deg: float = 0.0,
     enable_pseudorange_outlier_filter: bool = False,
-    apply_corrections: bool = True,
+    apply_corrections: bool = False,
     satellite_clock_biases: Optional[Dict[str, float]] = None,
     satellite_elevations: Optional[Dict[str, float]] = None,
 ) -> SppSolution:
     """使用迭代最小二乘求解接收机坐标和接收机钟差。
 
+    当前模拟伪距模式说明：
+    - apply_corrections 默认为 False。模拟伪距已通过误差模型将各项误差
+      （SISRE、电离层、对流层、接收机钟差、噪声）直接叠加在伪距观测值中，
+      最小二乘解算可以从伪距中恢复接收机位置与钟差，无需在解算前再做
+      卫星钟差/电离层/对流层的确定性修正。
+    - 若使用真实 OBS 观测文件，应传 apply_corrections=True 并提供
+      satellite_clock_biases 和 satellite_elevations，届时
+      apply_pseudorange_corrections() 将被调用。
+
     参数:
         satellite_positions: 卫星 ECEF 坐标字典
         pseudoranges: 原始模拟伪距字典（sat_id -> 伪距，单位米）
-        apply_corrections: 是否对伪距进行确定性修正（卫星钟差/对流层/电离层），默认 True
+        apply_corrections: 是否对伪距进行确定性修正（卫星钟差/对流层/电离层），默认 False
         satellite_clock_biases: 各卫星钟差（秒），apply_corrections=True 时使用
         satellite_elevations: 各卫星高度角（度），apply_corrections=True 时使用
     """

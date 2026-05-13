@@ -183,8 +183,6 @@ def generate_pseudorange_correction_debug_records(
             rec["satellite_clock_bias_s"] = clock_bias_s
             rec["satellite_clock_correction_m"] = clock_bias_s * C
             rec["debug_pseudorange"] = rec["simulated_pseudorange"]
-            rec["iono_error"] = rec.get("ionosphere_error")
-            rec["tropo_error"] = rec.get("troposphere_error")
             rec["debug_note"] = "模拟伪距调试记录，不参与SPP解算"
             records.append(rec)
         except Exception:

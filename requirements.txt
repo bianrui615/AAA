@@ -2,5 +2,8 @@ numpy
 matplotlib
 pandas
 pytest
-PySide6
+scikit-learn
+joblib
 PyQt6
+PySide6
+PyQt5

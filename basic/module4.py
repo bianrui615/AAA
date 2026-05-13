@@ -161,6 +161,27 @@ def _collect_satellite_data(
     return satellite_positions, satellite_clock_biases
 
 
+def _generate_epoch_pseudoranges(
+    satellite_positions: Dict[str, ECEF],
+    true_position: ECEF,
+    epoch_time: datetime,
+    rng: random.Random,
+) -> Tuple[List[dict], Dict[str, float]]:
+    """内部 helper：生成单历元模拟伪距记录和伪距字典。
+
+    当前仅支持 pseudorange_source="simulated"（模拟伪距）。
+    未来扩展 OBS 真实观测时，在此处添加新的来源分支，
+    run_continuous_positioning() 的主流程无需修改。
+    """
+    records = generate_simulated_pseudorange_records(
+        satellite_positions,
+        true_position,
+        epoch_time,
+        rng=rng,
+    )
+    return records, pseudorange_records_to_dict(records)
+
+
 def run_continuous_positioning(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     start_time: datetime,
@@ -175,8 +196,22 @@ def run_continuous_positioning(
     progress_callback: Optional[Callable[[dict, int, int], None]] = None,
     receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None,
     receiver_initial_approx: Optional[ECEF] = None,
+    pseudorange_source: str = "simulated",
 ) -> Tuple[List[dict], AnalysisSummary]:
-    """执行连续定位仿真，并保存模块四全部输出。"""
+    """执行连续定位仿真，并保存模块四全部输出。
+
+    参数:
+        pseudorange_source: 伪距来源，当前仅支持 "simulated"（模拟伪距）。
+            传入 "observed" 将抛出 NotImplementedError，该模式为后续 OBS 扩展预留。
+    """
+
+    if pseudorange_source == "observed":
+        raise NotImplementedError(
+            "OBS 真实观测伪距模式（pseudorange_source='observed'）为后续扩展预留，"
+            "当前版本尚未实现。请保持 pseudorange_source='simulated'。"
+        )
+    if pseudorange_source != "simulated":
+        raise ValueError(f"不支持的 pseudorange_source: {pseudorange_source!r}，当前仅支持 'simulated'。")
 
     if interval_seconds <= 0:
         raise ValueError("采样间隔必须为正数")
@@ -239,13 +274,12 @@ def run_continuous_positioning(
                 progress_callback(results[-1], len(results), total_epochs)
             continue
 
-        pseudo_records = generate_simulated_pseudorange_records(
+        pseudo_records, pseudoranges = _generate_epoch_pseudoranges(
             satellite_positions,
             true_position_epoch,
             epoch_time,
-            rng=rng,
+            rng,
         )
-        pseudoranges = pseudorange_records_to_dict(pseudo_records)
 
         # 计算每颗卫星相对接收机的高度角（用于对流层/电离层修正）
         satellite_elevations: Dict[str, float] = {
