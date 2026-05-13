@@ -56,11 +56,9 @@ def _time_range(start_time, end_time, interval_seconds: int):
         current += step
 
 
-def _get_basic_output_dir(nav_file_path: str) -> Path:
-    """根据 NAV 文件名找到基础部分对应的输出目录。"""
-    nav_name = Path(nav_file_path).name
-    safe_name = nav_name.replace(".", "_")
-    return Path(f"outputs/basic/{safe_name}")
+def _get_basic_output_dir(scenario_name: str) -> Path:
+    """根据场景名找到 gui_scenario_runner 对应的输出目录。"""
+    return Path(f"outputs/basic/gui_scenario_runner/{scenario_name}")
 
 
 def _load_from_basic_csv(scenario: ScenarioConfig) -> Optional[List[dict]]:
@@ -69,7 +67,7 @@ def _load_from_basic_csv(scenario: ScenarioConfig) -> Optional[List[dict]]:
 
     如果 CSV 不存在或解析失败，返回 None。
     """
-    basic_dir = _get_basic_output_dir(scenario.nav_file_path)
+    basic_dir = _get_basic_output_dir(scenario.name)
     csv_path = basic_dir / "module4_连续定位结果.csv"
     if not csv_path.exists():
         return None

@@ -1,4 +1,4 @@
-"""
+﻿"""
 run_enhance.py
 
 提高部分统一运行入口。
@@ -64,11 +64,11 @@ def write_technical_report(
         f.write("2. 数据来源说明\n")
         f.write("-" * 40 + "\n")
         f.write(
-            "数据由 enhance/dataset_builder.py 调用 basic/ 模块生成。\n"
+            "数据来源于 basic/gui_scenario_runner.py 运行的三场景结果。\n"
             "使用 enhance/enhance_config.py 中定义的 3 个不同 BDS-3 CNAV 导航文件：\n"
-            "  场景 1：nav/tarc0910.26b_cnav（北京区域，2026-04-01）\n"
-            "  场景 2：nav/tarc1210.26b_cnav（上海区域，2026-05-01）\n"
-            "  场景 3：nav/tarc1230.26b_cnav（广州区域，2026-05-03，含高度角截止）\n"
+            "  场景 1：nav/tarc0910.26b_cnav（静态接收机，2026-04-01）\n"
+            "  场景 2：nav/tarc1220.26b_cnav（动态直线运动，2026-05-02）\n"
+            "  场景 3：nav/tarc1230.26b_cnav（动态折线轨迹，2026-05-03）\n"
             "各场景独立随机种子，基于广播星历和模拟伪距误差模型产生定位结果。\n\n"
         )
 
