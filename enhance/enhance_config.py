@@ -99,7 +99,7 @@ FEATURE_COLUMNS: List[str] = [
     "max_elevation_deg",
 ]
 
-# 额外分析列（仅用于 ml_dataset.csv 中的误差分析，不作为模型输入特征）
+# 额外分析列（仅用于 机器学习数据集.csv 中的误差分析，不作为模型输入特征）
 EXTRA_ANALYSIS_COLUMNS: List[str] = [
     "mean_sisre_error",
     "mean_iono_error",

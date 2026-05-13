@@ -1,7 +1,7 @@
 """
 train_models.py
 
-读取 ml_dataset.csv，划分训练集/测试集，
+读取 机器学习数据集.csv，划分训练集/测试集，
 训练 LinearRegression 与 RandomForestRegressor 两个模型，
 并保存模型文件与划分摘要。
 """
@@ -99,7 +99,7 @@ def train_models(
     """训练线性回归和随机森林模型，保存模型并返回划分信息及测试集元数据。
 
     参数:
-        dataset_path: ml_dataset.csv 路径
+        dataset_path: 机器学习数据集.csv 路径
         test_size: 测试集比例，默认 0.3（按场景整体划分，非随机样本划分）
         random_state: 随机种子
         enable_grid_search: 是否启用 GridSearchCV 调优随机森林超参数（默认关闭）
@@ -139,7 +139,7 @@ def train_models(
     print("[train_models] 训练 LinearRegression...")
     lr_model = LinearRegression()
     lr_model.fit(X_train, y_train)
-    lr_path = MODEL_OUTPUT_DIR / "linear_regression_model.joblib"
+    lr_path = MODEL_OUTPUT_DIR / "线性回归模型.joblib"
     joblib.dump(lr_model, lr_path)
     print(f"[train_models] LinearRegression 已保存：{lr_path}")
 
@@ -170,12 +170,12 @@ def train_models(
             n_jobs=-1,
         )
         rf_model.fit(X_train, y_train)
-    rf_path = MODEL_OUTPUT_DIR / "random_forest_model.joblib"
+    rf_path = MODEL_OUTPUT_DIR / "随机森林模型.joblib"
     joblib.dump(rf_model, rf_path)
     print(f"[train_models] RandomForestRegressor 已保存：{rf_path}")
 
     # 保存划分摘要
-    summary_path = BASE_OUTPUT_DIR / "train_test_split_summary.txt"
+    summary_path = BASE_OUTPUT_DIR / "训练测试集划分汇总.txt"
     with summary_path.open("w", encoding="utf-8-sig") as f:
         f.write("机器学习数据集划分摘要\n")
         f.write("=" * 40 + "\n")
@@ -207,5 +207,5 @@ def train_models(
 
 
 if __name__ == "__main__":
-    dataset_path = BASE_OUTPUT_DIR / "ml_dataset.csv"
+    dataset_path = BASE_OUTPUT_DIR / "机器学习数据集.csv"
     train_models(dataset_path)

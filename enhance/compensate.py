@@ -37,7 +37,7 @@ def compensate_and_save(
     y_pred = model.predict(X_test)
 
     PREDICTION_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    csv_path = PREDICTION_OUTPUT_DIR / f"{model_name}_predictions.csv"
+    csv_path = PREDICTION_OUTPUT_DIR / f"{model_name}_补偿预测.csv"
 
     fieldnames = [
         "scenario_name",

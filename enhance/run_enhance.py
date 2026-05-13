@@ -9,7 +9,7 @@ run_enhance.py
 自动完成：
 1. 创建 outputs/enhance/ 目录结构；
 2. 构建至少 3 个场景并生成连续定位数据；
-3. 构建 ml_dataset.csv；
+3. 构建 机器学习数据集.csv；
 4. 划分训练集/测试集；
 5. 训练 LinearRegression 与 RandomForestRegressor；
 6. 误差预测与坐标补偿；
@@ -48,7 +48,7 @@ def write_technical_report(
     rf_rms_after: float,
     output_path: Path,
 ) -> None:
-    """生成技术报告 ml_technical_report.txt。"""
+    """生成技术报告 技术报告.txt。"""
     with output_path.open("w", encoding="utf-8-sig") as f:
         f.write("北斗 SPP 定位解算系统 — 提高部分技术报告\n")
         f.write("=" * 60 + "\n\n")
@@ -166,7 +166,7 @@ def write_technical_report(
                     "线性回归补偿后 RMS 误差更低，整体效果优于随机森林。\n"
                 )
         f.write(
-            "详细统计请参见 outputs/enhance/ml/ml_compensation_statistics.txt\n\n"
+            "详细统计请参见 outputs/enhance/ml/补偿效果统计.txt\n\n"
         )
 
         f.write("13. 优势、不足和改进方向\n")
@@ -271,7 +271,7 @@ def main() -> int:
     rf_rms_before, rf_rms_after = _read_rms(prediction_paths["random_forest"])
 
     # 7. 技术报告
-    report_path = BASE_OUTPUT_DIR / "ml_technical_report.txt"
+    report_path = BASE_OUTPUT_DIR / "技术报告.txt"
     write_technical_report(
         n_total=n_total,
         n_train=n_train,
@@ -312,10 +312,10 @@ def main() -> int:
         prediction_paths["random_forest"],
         eval_paths["summary_csv"],
         eval_paths["stats_txt"],
-        FIGURE_OUTPUT_DIR / "error_curve_linear_regression.png",
-        FIGURE_OUTPUT_DIR / "error_curve_random_forest.png",
-        FIGURE_OUTPUT_DIR / "model_comparison_bar.png",
-        FIGURE_OUTPUT_DIR / "predicted_vs_true_error.png",
+        FIGURE_OUTPUT_DIR / "linear_regression_误差曲线.png",
+        FIGURE_OUTPUT_DIR / "random_forest_误差曲线.png",
+        FIGURE_OUTPUT_DIR / "模型对比柱状图.png",
+        FIGURE_OUTPUT_DIR / "预测与真实误差对比.png",
         report_path,
     ]
     for fp in files:

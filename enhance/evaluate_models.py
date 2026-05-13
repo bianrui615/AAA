@@ -107,7 +107,7 @@ def evaluate_and_visualize(
     rf_metrics = compute_metrics(rf_rows)
 
     # 1. 模型对比 summary CSV
-    summary_csv = BASE_OUTPUT_DIR / "model_comparison_summary.csv"
+    summary_csv = BASE_OUTPUT_DIR / "模型对比汇总.csv"
     with summary_csv.open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow([
@@ -141,7 +141,7 @@ def evaluate_and_visualize(
             ])
 
     # 2. 中文统计报告 TXT
-    stats_txt = BASE_OUTPUT_DIR / "ml_compensation_statistics.txt"
+    stats_txt = BASE_OUTPUT_DIR / "补偿效果统计.txt"
     with stats_txt.open("w", encoding="utf-8-sig") as f:
         f.write("机器学习误差补偿统计报告\n")
         f.write("=" * 50 + "\n\n")
@@ -238,7 +238,7 @@ def _plot_error_curves(rows: List[dict], model_name: str) -> None:
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    fig.savefig(FIGURE_OUTPUT_DIR / f"error_curve_{model_name}.png", dpi=160)
+    fig.savefig(FIGURE_OUTPUT_DIR / f"{model_name}_误差曲线.png", dpi=160)
     plt.close(fig)
 
 
@@ -282,7 +282,7 @@ def _plot_model_comparison_bar(lr_metrics: dict, rf_metrics: dict) -> None:
     ax.legend()
     ax.grid(True, alpha=0.3, axis="y")
     fig.tight_layout()
-    fig.savefig(FIGURE_OUTPUT_DIR / "model_comparison_bar.png", dpi=160)
+    fig.savefig(FIGURE_OUTPUT_DIR / "模型对比柱状图.png", dpi=160)
     plt.close(fig)
 
 
@@ -332,7 +332,7 @@ def _plot_predicted_vs_true(lr_rows: List[dict], rf_rows: List[dict]) -> None:
         ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
-    fig.savefig(FIGURE_OUTPUT_DIR / "predicted_vs_true_error.png", dpi=160)
+    fig.savefig(FIGURE_OUTPUT_DIR / "预测与真实误差对比.png", dpi=160)
     plt.close(fig)
 
 

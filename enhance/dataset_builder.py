@@ -6,7 +6,7 @@ dataset_builder.py
 对 enhance_config.py 中定义的每个场景：
 1. 调用 basic/ 中的星历解析、卫星位置计算、伪距模拟、SPP 解算；
 2. 逐历元收集定位结果与伪距统计特征；
-3. 输出 ml_dataset.csv（仅包含成功解算历元）。
+3. 输出 机器学习数据集.csv（仅包含成功解算历元）。
 """
 
 from __future__ import annotations
@@ -230,7 +230,7 @@ def _save_scenario_results(records: List[dict], output_dir: Path) -> None:
 
 
 def build_dataset() -> Path:
-    """运行所有场景并构建 ml_dataset.csv。
+    """运行所有场景并构建 机器学习数据集.csv。
 
     仅保留成功解算历元写入数据集。
     返回数据集 CSV 路径。
@@ -252,7 +252,7 @@ def build_dataset() -> Path:
     if not success_records:
         raise RuntimeError("所有场景均无成功解算历元，无法构建数据集。")
 
-    dataset_path = BASE_OUTPUT_DIR / "ml_dataset.csv"
+    dataset_path = BASE_OUTPUT_DIR / "机器学习数据集.csv"
     all_columns = [
         "scenario_name",
         "epoch_time",

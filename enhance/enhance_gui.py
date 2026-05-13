@@ -244,7 +244,7 @@ class EnhanceMainWindow(QMainWindow):
 
         csv_row = QHBoxLayout()
         self._csv_edit = QLineEdit()
-        self._csv_edit.setPlaceholderText("ml_dataset.csv 路径（留空则使用默认路径）")
+        self._csv_edit.setPlaceholderText("机器学习数据集.csv 路径（留空则使用默认路径）")
         csv_btn = QPushButton("浏览")
         csv_btn.setFixedWidth(55)
         csv_btn.clicked.connect(self._browse_csv)
@@ -402,7 +402,7 @@ class EnhanceMainWindow(QMainWindow):
             QMessageBox.warning(self, "提示", "当前有任务正在运行，请等待完成后再操作。")
             return
 
-        csv_path = self._csv_edit.text().strip() or str(BASE_OUTPUT_DIR / "ml_dataset.csv")
+        csv_path = self._csv_edit.text().strip() or str(BASE_OUTPUT_DIR / "机器学习数据集.csv")
         self._progress_bar.setValue(0)
         self._set_buttons_enabled(False)
         self._log(f"\n[{task}] 任务开始...")
@@ -431,8 +431,8 @@ class EnhanceMainWindow(QMainWindow):
 
         if "dataset_path" in result:
             self._load_dataset_preview(Path(result["dataset_path"]))
-        elif (BASE_OUTPUT_DIR / "ml_dataset.csv").exists():
-            self._load_dataset_preview(BASE_OUTPUT_DIR / "ml_dataset.csv")
+        elif (BASE_OUTPUT_DIR / "机器学习数据集.csv").exists():
+            self._load_dataset_preview(BASE_OUTPUT_DIR / "机器学习数据集.csv")
 
         if "eval_paths" in result:
             self._load_charts(result["eval_paths"])
@@ -560,11 +560,11 @@ class EnhanceMainWindow(QMainWindow):
 
     def _load_report(self) -> None:
         """在 Tab5 读取技术报告文本。"""
-        report_path = BASE_OUTPUT_DIR / "ml_technical_report.txt"
+        report_path = BASE_OUTPUT_DIR / "技术报告.txt"
         if report_path.exists():
             self._report_text.setPlainText(report_path.read_text(encoding="utf-8-sig"))
         else:
-            stats_path = BASE_OUTPUT_DIR / "ml_compensation_statistics.txt"
+            stats_path = BASE_OUTPUT_DIR / "补偿效果统计.txt"
             if stats_path.exists():
                 self._report_text.setPlainText(stats_path.read_text(encoding="utf-8-sig"))
 
