@@ -258,28 +258,28 @@ def failed_summary(failure_reason: str) -> AnalysisSummary:
 def write_summary_csv(run_results: List[ScenarioRunResult], csv_path: Path) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
-        "scenario_name",
-        "rinex_file",
-        "trajectory_mode",
-        "start_time",
-        "end_time",
-        "interval_seconds",
-        "receiver_lat",
-        "receiver_lon",
-        "receiver_height",
-        "total_epochs",
-        "success_epochs",
-        "failed_epochs",
-        "success_rate",
-        "average_satellite_count",
-        "average_pdop",
-        "average_gdop",
-        "mean_error_3d",
-        "rms_error_3d",
-        "max_error_3d",
-        "output_dir",
-        "status",
-        "failure_reason",
+        "场景名称",
+        "RINEX文件",
+        "轨迹模式",
+        "起始时间",
+        "结束时间",
+        "采样间隔_s",
+        "接收机纬度",
+        "接收机经度",
+        "接收机高度",
+        "总历元数",
+        "成功历元数",
+        "失败历元数",
+        "成功率",
+        "平均卫星数",
+        "平均PDOP",
+        "平均GDOP",
+        "平均误差",
+        "RMS误差",
+        "最大误差",
+        "输出目录",
+        "状态",
+        "失败原因",
     ]
     with csv_path.open("w", newline="", encoding="utf-8-sig") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -289,28 +289,28 @@ def write_summary_csv(run_results: List[ScenarioRunResult], csv_path: Path) -> N
             summary = item.summary
             writer.writerow(
                 {
-                    "scenario_name": s.name,
-                    "rinex_file": s.rinex_file,
-                    "trajectory_mode": s.trajectory_mode,
-                    "start_time": s.start_time.isoformat(sep=" "),
-                    "end_time": s.end_time.isoformat(sep=" "),
-                    "interval_seconds": s.interval_seconds,
-                    "receiver_lat": s.receiver_lat,
-                    "receiver_lon": s.receiver_lon,
-                    "receiver_height": s.receiver_height,
-                    "total_epochs": summary.total_epochs,
-                    "success_epochs": summary.success_epochs,
-                    "failed_epochs": summary.failed_epochs,
-                    "success_rate": summary.success_rate,
-                    "average_satellite_count": summary.average_satellite_count,
-                    "average_pdop": summary.average_pdop,
-                    "average_gdop": summary.average_gdop,
-                    "mean_error_3d": summary.mean_error_3d,
-                    "rms_error_3d": summary.rms_error_3d,
-                    "max_error_3d": summary.max_error_3d,
-                    "output_dir": str(item.output_dir),
-                    "status": item.status,
-                    "failure_reason": item.failure_reason,
+                    "场景名称": s.name,
+                    "RINEX文件": s.rinex_file,
+                    "轨迹模式": s.trajectory_mode,
+                    "起始时间": s.start_time.isoformat(sep=" "),
+                    "结束时间": s.end_time.isoformat(sep=" "),
+                    "采样间隔_s": s.interval_seconds,
+                    "接收机纬度": s.receiver_lat,
+                    "接收机经度": s.receiver_lon,
+                    "接收机高度": s.receiver_height,
+                    "总历元数": summary.total_epochs,
+                    "成功历元数": summary.success_epochs,
+                    "失败历元数": summary.failed_epochs,
+                    "成功率": summary.success_rate,
+                    "平均卫星数": summary.average_satellite_count,
+                    "平均PDOP": summary.average_pdop,
+                    "平均GDOP": summary.average_gdop,
+                    "平均误差": summary.mean_error_3d,
+                    "RMS误差": summary.rms_error_3d,
+                    "最大误差": summary.max_error_3d,
+                    "输出目录": str(item.output_dir),
+                    "状态": item.status,
+                    "失败原因": item.failure_reason,
                 }
             )
 
@@ -340,8 +340,8 @@ def write_text_report(run_results: List[ScenarioRunResult], report_path: Path) -
             file.write(f"起止时间：{s.start_time.isoformat(sep=' ')} 至 {s.end_time.isoformat(sep=' ')}\n")
             file.write(
                 "接收机经纬高："
-                f"lat={s.receiver_lat:.8f} deg, lon={s.receiver_lon:.8f} deg, "
-                f"height={s.receiver_height:.3f} m\n"
+                f"纬度={s.receiver_lat:.8f}°, 经度={s.receiver_lon:.8f}°, "
+                f"高度={s.receiver_height:.3f} m\n"
             )
             file.write(f"轨迹模式：{s.trajectory_mode}\n")
             if s.trajectory_mode == "静态接收机":
@@ -349,13 +349,13 @@ def write_text_report(run_results: List[ScenarioRunResult], report_path: Path) -
             elif s.trajectory_mode == "动态直线运动":
                 file.write(
                     "动态直线速度："
-                    f"E={s.velocity_east_mps:.4f} m/s, "
-                    f"N={s.velocity_north_mps:.4f} m/s, "
-                    f"U={s.velocity_up_mps:.4f} m/s\n"
+                    f"东向={s.velocity_east_mps:.4f} m/s, "
+                    f"北向={s.velocity_north_mps:.4f} m/s, "
+                    f"天向={s.velocity_up_mps:.4f} m/s\n"
                 )
                 file.write("跟踪效果说明：真实轨迹按 ENU 匀速位移转换为 ECEF，解算轨迹随历元连续跟踪。\n")
             elif s.trajectory_mode == "动态折线轨迹":
-                file.write("动态折线控制点：(time_offset_s, dE_m, dN_m, dU_m)\n")
+                file.write("动态折线控制点：(时间偏移_s, 东向偏移_m, 北向偏移_m, 天向偏移_m)\n")
                 for point in s.trajectory_points:
                     file.write(f"  {point}\n")
                 file.write("跟踪效果说明：真实轨迹按控制点线性插值，再转换为 ECEF，与解算轨迹对比输出。\n")
@@ -436,9 +436,9 @@ if QT_IMPORT_ERROR is None:
             self.interval_spin = QSpinBox()
             self.interval_spin.setRange(1, 86400)
             self.interval_spin.setSuffix(" s")
-            time_layout.addRow("start_time", self.start_edit)
-            time_layout.addRow("end_time", self.end_edit)
-            time_layout.addRow("interval_seconds", self.interval_spin)
+            time_layout.addRow("起始时间", self.start_edit)
+            time_layout.addRow("结束时间", self.end_edit)
+            time_layout.addRow("采样间隔 (秒)", self.interval_spin)
             layout.addWidget(time_group)
 
             receiver_group = QGroupBox("接收机经纬高")
@@ -452,9 +452,9 @@ if QT_IMPORT_ERROR is None:
             self.height_spin = QDoubleSpinBox()
             self.height_spin.setRange(-1000.0, 10000.0)
             self.height_spin.setDecimals(3)
-            receiver_layout.addRow("latitude_deg", self.lat_spin)
-            receiver_layout.addRow("longitude_deg", self.lon_spin)
-            receiver_layout.addRow("height_m", self.height_spin)
+            receiver_layout.addRow("纬度 (°)", self.lat_spin)
+            receiver_layout.addRow("经度 (°)", self.lon_spin)
+            receiver_layout.addRow("高度 (m)", self.height_spin)
             layout.addWidget(receiver_group)
 
             params_group = QGroupBox("解算参数")
@@ -470,10 +470,10 @@ if QT_IMPORT_ERROR is None:
             self.threshold_spin.setRange(1e-9, 1000.0)
             self.threshold_spin.setDecimals(9)
             self.threshold_spin.setSingleStep(0.0001)
-            params_layout.addRow("random_seed", self.seed_spin)
-            params_layout.addRow("elevation_mask_deg", self.elevation_spin)
-            params_layout.addRow("max_iter", self.max_iter_spin)
-            params_layout.addRow("convergence_threshold", self.threshold_spin)
+            params_layout.addRow("随机种子", self.seed_spin)
+            params_layout.addRow("高度角截止阈值 (°)", self.elevation_spin)
+            params_layout.addRow("最大迭代次数", self.max_iter_spin)
+            params_layout.addRow("收敛阈值", self.threshold_spin)
             layout.addWidget(params_group)
 
             trajectory_group = QGroupBox("轨迹模式")
@@ -499,9 +499,9 @@ if QT_IMPORT_ERROR is None:
             self.vu_spin = QDoubleSpinBox()
             self.vu_spin.setRange(-1000.0, 1000.0)
             self.vu_spin.setDecimals(4)
-            linear_layout.addRow("velocity_east_mps", self.ve_spin)
-            linear_layout.addRow("velocity_north_mps", self.vn_spin)
-            linear_layout.addRow("velocity_up_mps", self.vu_spin)
+            linear_layout.addRow("东向速度 (m/s)", self.ve_spin)
+            linear_layout.addRow("北向速度 (m/s)", self.vn_spin)
+            linear_layout.addRow("天向速度 (m/s)", self.vu_spin)
 
             polyline_page = QWidget()
             polyline_layout = QVBoxLayout(polyline_page)
@@ -514,7 +514,7 @@ if QT_IMPORT_ERROR is None:
             button_row.addWidget(remove_button)
             button_row.addStretch(1)
             self.trajectory_table = QTableWidget(0, 4)
-            self.trajectory_table.setHorizontalHeaderLabels(["time_offset_s", "dE_m", "dN_m", "dU_m"])
+            self.trajectory_table.setHorizontalHeaderLabels(["时间偏移(s)", "东向偏移(m)", "北向偏移(m)", "天向偏移(m)"])
             self.trajectory_table.horizontalHeader().setSectionResizeMode(_header_resize_mode("Stretch"))
             polyline_layout.addLayout(button_row)
             polyline_layout.addWidget(self.trajectory_table)
@@ -748,8 +748,8 @@ if QT_IMPORT_ERROR is None:
                 self.progress_changed.emit(min(completed_epochs, total_epochs), max(total_epochs, 1))
                 self.scenario_finished.emit(item)
 
-            summary_path = self.output_root / "gui_three_scenario_summary.csv"
-            report_path = self.output_root / "gui_three_scenario_report.txt"
+            summary_path = self.output_root / "三场景汇总.csv"
+            report_path = self.output_root / "三场景评估报告.txt"
             write_summary_csv(run_results, summary_path)
             write_text_report(run_results, report_path)
             self.log_message.emit(f"三场景汇总 CSV：{summary_path}")
@@ -823,7 +823,7 @@ if QT_IMPORT_ERROR is None:
             detail_splitter = QSplitter(_qt_value("Vertical", "Orientation"))
             self.result_table = QTableWidget(0, 9)
             self.result_table.setHorizontalHeaderLabels(
-                ["epoch", "status", "sats", "true_X", "true_Y", "true_Z", "X", "Y", "Z"]
+                ["历元时间", "状态", "卫星数", "真实X", "真实Y", "真实Z", "解算X", "解算Y", "解算Z"]
             )
             self.result_table.horizontalHeader().setSectionResizeMode(_header_resize_mode("ResizeToContents"))
             detail_splitter.addWidget(self.result_table)
@@ -914,10 +914,10 @@ if QT_IMPORT_ERROR is None:
                     QMessageBox.warning(self, "缺少 RINEX 文件", f"{item.name} 未选择 RINEX 文件。")
                     return False
                 if item.end_time <= item.start_time:
-                    QMessageBox.warning(self, "时间设置错误", f"{item.name} 的 end_time 必须晚于 start_time。")
+                    QMessageBox.warning(self, "时间设置错误", f"{item.name} 的结束时间必须晚于起始时间。")
                     return False
                 if item.interval_seconds <= 0:
-                    QMessageBox.warning(self, "采样间隔错误", f"{item.name} 的 interval_seconds 必须为正数。")
+                    QMessageBox.warning(self, "采样间隔错误", f"{item.name} 的采样间隔必须为正数。")
                     return False
             return True
 
@@ -958,7 +958,7 @@ if QT_IMPORT_ERROR is None:
             self.refresh_summary_table()
             self.refresh_current_view()
             self.run_button.setEnabled(True)
-            self.log(f"全部完成。summary={summary_path}, report={report_path}")
+            self.log(f"全部完成。汇总={summary_path}, 报告={report_path}")
             QMessageBox.information(self, "完成", "三场景解算与自动评估已完成。")
 
         def log(self, message: str) -> None:
