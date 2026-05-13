@@ -7,8 +7,8 @@ module2.py
 1. 根据广播星历计算北斗卫星在 ECEF 坐标系下的位置，单位为米；
 2. 实现轨道摄动修正（delta_u、delta_r、delta_i）；
 3. 实现卫星钟差计算，包括多项式钟差修正和相对论效应修正；
-4. 输出 module2_satellite_debug.csv（含中间调试变量）和卫星位置钟差 CSV；
-5. 输出 module2_pseudorange_correction_debug.csv（伪距修正调试文件，仅用于调试和实验报告展示，不参与 SPP 解算）。
+4. 输出 module2_卫星位置调试.csv（含中间调试变量）和卫星位置钟差 CSV；
+5. 输出 module2_伪距修正调试.csv（伪距修正调试文件，仅用于调试和实验报告展示，不参与 SPP 解算）。
 
 注：核心计算逻辑统一调用 module1.py 的函数，模块二本身为组织与输出层。
 """
@@ -116,7 +116,7 @@ def calculate_satellite_debug_data(
     """计算指定测试历元下健康北斗卫星的位置中间调试变量。
 
     返回记录包含 Kepler 轨道参数、摄动修正量、轨道平面坐标等，
-    用于输出 module2_satellite_debug.csv。
+    用于输出 module2_卫星位置调试.csv。
 
     底层调用 module1 的 compute_satellite_position_with_debug。
     """
@@ -145,7 +145,7 @@ def generate_pseudorange_correction_debug_records(
     receiver_approx: Tuple[float, float, float],
     rng: Optional[random.Random] = None,
 ) -> List[dict]:
-    """生成伪距修正调试记录，用于输出 module2_pseudorange_correction_debug.csv。
+    """生成伪距修正调试记录，用于输出 module2_伪距修正调试.csv。
 
     说明：
     - 该文件仅用于模块二调试和实验报告展示；
@@ -199,8 +199,8 @@ def save_satellite_position_outputs(
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    csv_path = output_path / "module2_satellite_position_clock.csv"
-    summary_path = output_path / "module2_satellite_position_summary.txt"
+    csv_path = output_path / "module2_卫星位置与钟差.csv"
+    summary_path = output_path / "module2_卫星位置汇总.txt"
 
     fieldnames = [
         "epoch_time",
@@ -271,7 +271,7 @@ def save_satellite_debug_csv(
     debug_records: List[dict],
     output_dir: str | Path,
 ) -> Path:
-    """保存 module2_satellite_debug.csv，包含卫星位置计算的中间调试变量。
+    """保存 module2_卫星位置调试.csv，包含卫星位置计算的中间调试变量。
 
     字段说明（所有角度单位为 rad，距离单位为 m，时间单位为 s）：
     - tk: 相对 toe 的时间差
@@ -291,7 +291,7 @@ def save_satellite_debug_csv(
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    csv_path = output_path / "module2_satellite_debug.csv"
+    csv_path = output_path / "module2_卫星位置调试.csv"
 
     fieldnames = [
         "epoch_time", "sat_id", "health", "tk", "semi_major_axis",
@@ -312,7 +312,7 @@ def save_pseudorange_correction_debug_csv(
     debug_records: List[dict],
     output_dir: str | Path,
 ) -> Path:
-    """保存 module2_pseudorange_correction_debug.csv。
+    """保存 module2_伪距修正调试.csv。
 
     该文件为模块二调试输出，仅用于展示 rho、卫星钟差、各项误差与模拟伪距
     之间的关系，不作为模块三 SPP 解算输入。
@@ -336,7 +336,7 @@ def save_pseudorange_correction_debug_csv(
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    csv_path = output_path / "module2_pseudorange_correction_debug.csv"
+    csv_path = output_path / "module2_伪距修正调试.csv"
 
     fieldnames = [
         "epoch_time", "sat_id", "sat_X", "sat_Y", "sat_Z", "health",
@@ -364,14 +364,14 @@ if __name__ == "__main__":
     # 1. 计算卫星位置与钟差，输出原有 CSV 和摘要
     rows = calculate_all_satellite_positions(nav, test_epoch)
     paths = save_satellite_position_outputs(rows, "outputs/basic/module", test_epoch)
-    print(f"module2_satellite_position_clock.csv and summary saved.")
+    print(f"module2_卫星位置与钟差.csv and summary saved.")
 
-    # 2. 输出 module2_satellite_debug.csv（中间调试变量）
+    # 2. 输出 module2_卫星位置调试.csv（中间调试变量）
     debug_rows = calculate_satellite_debug_data(nav, test_epoch)
     debug_path = save_satellite_debug_csv(debug_rows, "outputs/basic/module")
-    print(f"module2_satellite_debug.csv saved: {debug_path}")
+    print(f"module2_卫星位置调试.csv saved: {debug_path}")
 
-    # 3. 输出 module2_pseudorange_correction_debug.csv（伪距修正调试文件）
+    # 3. 输出 module2_伪距修正调试.csv（伪距修正调试文件）
     debug_rows = generate_pseudorange_correction_debug_records(nav, test_epoch, receiver_approx, rng=rng)
     debug_path = save_pseudorange_correction_debug_csv(debug_rows, "outputs/basic/module")
-    print(f"module2_pseudorange_correction_debug.csv saved: {debug_path}")
+    print(f"module2_伪距修正调试.csv saved: {debug_path}")

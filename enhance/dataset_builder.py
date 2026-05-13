@@ -202,8 +202,8 @@ def run_scenario_and_collect(
 
 
 def _save_scenario_results(records: List[dict], output_dir: Path) -> None:
-    """保存场景连续定位结果到 scenarios/scenario_X/module4_continuous_position_results.csv。"""
-    csv_path = output_dir / "module4_continuous_position_results.csv"
+    """保存场景连续定位结果到 scenarios/scenario_X/module4_连续定位结果.csv。"""
+    csv_path = output_dir / "module4_连续定位结果.csv"
     if not records:
         return
 

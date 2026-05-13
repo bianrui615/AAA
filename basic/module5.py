@@ -145,7 +145,7 @@ def write_system_test_report(
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    report_path = output_path / "module5_system_test_report.txt"
+    report_path = output_path / "module5_系统测试报告.txt"
 
     with report_path.open("w", encoding="utf-8-sig") as file:
         file.write("模块五：系统整合与测试报告\n")
@@ -378,11 +378,11 @@ def main() -> int:
             receiver_initial_approx=receiver_initial_approx,
         )
         module_outputs["module4"] = [
-            output_path / "module4_continuous_position_results.csv",
-            output_path / "module4_error_statistics.txt",
-            output_path / "module4_error_curve.png",
-            output_path / "module4_trajectory.png",
-            output_path / "module4_satellite_dop_curve.png",
+            output_path / "module4_连续定位结果.csv",
+            output_path / "module4_误差统计.txt",
+            output_path / "module4_误差曲线.png",
+            output_path / "module4_轨迹图.png",
+            output_path / "module4_卫星DOP曲线.png",
         ]
         module_status["module4"] = "完成"
 

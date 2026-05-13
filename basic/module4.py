@@ -370,9 +370,9 @@ def run_continuous_positioning(
         if progress_callback is not None:
             progress_callback(results[-1], len(results), total_epochs)
 
-    save_results_to_csv(results, output_path / "module4_continuous_position_results.csv")
+    save_results_to_csv(results, output_path / "module4_连续定位结果.csv")
     summary = calculate_summary(results)
-    save_error_statistics(summary, output_path / "module4_error_statistics.txt", results=results)
+    save_error_statistics(summary, output_path / "module4_误差统计.txt", results=results)
     plot_results(results, output_path)
     return results, summary
 
@@ -580,7 +580,7 @@ def plot_results(
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(output_path / "module4_error_curve.png", dpi=160)
+    plt.savefig(output_path / "module4_误差曲线.png", dpi=160)
     plt.close()
 
     # 经纬度轨迹图：支持真实轨迹与解算轨迹
@@ -608,7 +608,7 @@ def plot_results(
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(output_path / "module4_trajectory.png", dpi=160)
+    plt.savefig(output_path / "module4_轨迹图.png", dpi=160)
     plt.close()
 
     # 额外输出真实轨迹 vs 解算轨迹对比图（动态模式下更有意义）
@@ -626,7 +626,7 @@ def plot_results(
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig(output_path / "module4_true_vs_estimated_trajectory.png", dpi=160)
+        plt.savefig(output_path / "module4_真实与估计轨迹对比.png", dpi=160)
         plt.close()
 
     fig, ax1 = plt.subplots(figsize=(10, 5))
@@ -647,7 +647,7 @@ def plot_results(
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
     plt.title("模块四：卫星数量与 DOP 变化曲线")
     fig.tight_layout()
-    plt.savefig(output_path / "module4_satellite_dop_curve.png", dpi=160)
+    plt.savefig(output_path / "module4_卫星DOP曲线.png", dpi=160)
     plt.close(fig)
 
     _plot_dop_error_analysis(results, output_path)
@@ -657,7 +657,7 @@ def _plot_dop_error_analysis(results: List[dict], output_path: "Path") -> None:
     """绘制 DOP 与定位误差关系分析图（2×2 布局）。
 
     包含 PDOP vs 误差、GDOP vs 误差、卫星数 vs 误差、误差直方图四个子图。
-    结果保存为 module4_dop_error_analysis.png。
+    结果保存为 module4_DOP与误差分析.png。
     """
     if plt is None:
         return
@@ -740,7 +740,7 @@ def _plot_dop_error_analysis(results: List[dict], output_path: "Path") -> None:
 
     plt.suptitle("模块四：DOP 与定位精度关系分析", fontsize=14)
     plt.tight_layout()
-    plt.savefig(Path(output_path) / "module4_dop_error_analysis.png", dpi=160)
+    plt.savefig(Path(output_path) / "module4_DOP与误差分析.png", dpi=160)
     plt.close(fig)
 
 
@@ -781,10 +781,10 @@ if __name__ == "__main__":
     print(f"  - 平均 PDOP: {summary.average_pdop:.6f}")
     print(f"  - 输出目录: {_output_dir}/")
     print(f"  - 输出文件:")
-    print(f"      module4_continuous_position_results.csv")
-    print(f"      module4_error_statistics.txt")
-    print(f"      module4_error_curve.png")
-    print(f"      module4_trajectory.png")
-    print(f"      module4_satellite_dop_curve.png")
-    if Path(_output_dir).exists() and any(Path(_output_dir).glob("module4_true_vs_estimated_trajectory.png")):
-        print(f"      module4_true_vs_estimated_trajectory.png")
+    print(f"      module4_连续定位结果.csv")
+    print(f"      module4_误差统计.txt")
+    print(f"      module4_误差曲线.png")
+    print(f"      module4_轨迹图.png")
+    print(f"      module4_卫星DOP曲线.png")
+    if Path(_output_dir).exists() and any(Path(_output_dir).glob("module4_真实与估计轨迹对比.png")):
+        print(f"      module4_真实与估计轨迹对比.png")

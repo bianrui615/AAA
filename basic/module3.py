@@ -638,8 +638,8 @@ def save_single_epoch_spp_outputs(
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    csv_path = output_path / "module3_pseudorange_single_epoch.csv"
-    txt_path = output_path / "module3_spp_result_single_epoch.txt"
+    csv_path = output_path / "module3_单历元伪距.csv"
+    txt_path = output_path / "module3_单历元定位结果.txt"
 
     fieldnames = [
         "epoch_time",

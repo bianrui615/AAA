@@ -1099,8 +1099,8 @@ def _save_nav_debug_csv(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     output_path: Path,
 ) -> Path:
-    """保存 module1_parsed_nav_debug.csv。"""
-    csv_path = output_path / "module1_parsed_nav_debug.csv"
+    """保存 module1_导航电文解析调试.csv。"""
+    csv_path = output_path / "module1_导航电文解析调试.csv"
     fieldnames = [
         "sat_id", "toc", "toe", "af0", "af1", "af2",
         "sqrtA", "e", "i0", "Omega0", "omega", "M0",
@@ -1150,8 +1150,8 @@ def _save_nav_summary(
     output_path: Path,
     parse_info: NavParseInfo,
 ) -> Path:
-    """保存 module1_nav_parse_summary.txt。"""
-    summary_path = output_path / "module1_nav_parse_summary.txt"
+    """保存 module1_导航电文解析汇总.txt。"""
+    summary_path = output_path / "module1_导航电文解析汇总.txt"
     total_records = sum(len(items) for items in nav_data.values())
     with summary_path.open("w", encoding="utf-8-sig") as file:
         file.write("模块一：RINEX NAV 导航文件解析结果\n")
@@ -1173,8 +1173,8 @@ def _save_ephemeris_list_csv(
     nav_data: Dict[str, List[BroadcastEphemeris]],
     output_path: Path,
 ) -> Path:
-    """保存 module1_ephemeris_list.csv（兼容旧输出格式）。"""
-    csv_path = output_path / "module1_ephemeris_list.csv"
+    """保存 module1_星历列表.csv（兼容旧输出格式）。"""
+    csv_path = output_path / "module1_星历列表.csv"
     fieldnames = [
         "sat_id", "toc_time", "toe", "af0", "af1", "af2",
         "sqrtA", "e", "i0", "Omega0", "omega", "M0", "delta_n", "health",
@@ -1208,8 +1208,8 @@ def _save_ephemeris_list_csv(
 
 
 def _save_simulated_pseudorange_csv(records: List[dict], output_path: Path) -> Path:
-    """保存 module1_simulated_pseudorange.csv。"""
-    csv_path = output_path / "module1_simulated_pseudorange.csv"
+    """保存 module1_模拟伪距.csv。"""
+    csv_path = output_path / "module1_模拟伪距.csv"
     fieldnames = [
         "epoch", "sat_id", "sat_x", "sat_y", "sat_z",
         "receiver_x", "receiver_y", "receiver_z",

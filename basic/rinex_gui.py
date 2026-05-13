@@ -1148,7 +1148,7 @@ if QT_IMPORT_ERROR is None:
             self.log(f"解算失败：{message}")
 
         def load_existing_csv(self) -> None:
-            default_path = Path(OUTPUT_DIR) / "module4_continuous_position_results.csv"
+            default_path = Path(OUTPUT_DIR) / "module4_连续定位结果.csv"
             file_name, _ = QFileDialog.getOpenFileName(
                 self,
                 "载入定位结果 CSV",
@@ -1186,13 +1186,13 @@ if QT_IMPORT_ERROR is None:
             target_dir = Path(target_name)
             exported = 0
             wanted = [
-                "module4_continuous_position_results.csv",
-                "module4_error_statistics.txt",
-                "module4_error_curve.png",
-                "module4_trajectory.png",
-                "module4_true_vs_estimated_trajectory.png",
-                "module4_satellite_dop_curve.png",
-                "module5_system_test_report.txt",
+                "module4_连续定位结果.csv",
+                "module4_误差统计.txt",
+                "module4_误差曲线.png",
+                "module4_轨迹图.png",
+                "module4_真实与估计轨迹对比.png",
+                "module4_卫星DOP曲线.png",
+                "module5_系统测试报告.txt",
             ]
             for name in wanted:
                 src = source_dir / name
