@@ -105,6 +105,13 @@ RECEIVER_INITIAL_APPROX_POSITION = (
 )
 
 
+def _get_output_dir(nav_file_path: str | Path) -> str:
+    """根据 NAV 文件名生成输出目录。"""
+    nav_name = Path(nav_file_path).name
+    safe_name = nav_name.replace(".", "_")
+    return f"outputs/basic/{safe_name}"
+
+
 def _format_float(value: float, digits: int = 3) -> str:
     """格式化浮点数，遇到 NaN 时返回字符串 NaN。"""
 
@@ -231,7 +238,7 @@ def write_system_test_report(
     return report_path
 
 
-def print_test_report(summary: AnalysisSummary, report_path: Path) -> None:
+def print_test_report(summary: AnalysisSummary, report_path: Path, output_dir: str | Path) -> None:
     """在终端输出简洁的中文测试报告。"""
 
     print("\n========== 北斗定位解算全流程软件系统测试报告 ==========")
@@ -245,14 +252,15 @@ def print_test_report(summary: AnalysisSummary, report_path: Path) -> None:
     print(f"RMS 误差：{_format_float(summary.rms_error_3d, 3)} m")
     print(f"最大误差：{_format_float(summary.max_error_3d, 3)} m")
     print(f"系统测试报告：{report_path}")
-    print(f"输出目录：{Path(OUTPUT_DIR).resolve()}")
+    print(f"输出目录：{Path(output_dir).resolve()}")
     print("======================================================\n")
 
 
 def main() -> int:
     """主程序入口。"""
 
-    output_path = Path(OUTPUT_DIR)
+    output_dir = _get_output_dir(NAV_FILE_PATH)
+    output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     module_status: Dict[str, str] = {}
     module_outputs: Dict[str, List[Path]] = {}
@@ -273,7 +281,7 @@ def main() -> int:
             receiver_approx=RECEIVER_TRUE_POSITION,
             epochs=[TEST_EPOCH_TIME],
             seed=RANDOM_SEED,
-            output_dir=OUTPUT_DIR,
+            output_dir=output_dir,
             elevation_mask_deg=ELEVATION_MASK_DEG,
             enable_pseudorange_outlier_filter=False,
         )
@@ -292,13 +300,13 @@ def main() -> int:
 
         print("模块二：正在计算卫星位置与钟差...")
         module2_position_records = calculate_all_satellite_positions(nav_data, TEST_EPOCH_TIME)
-        module2_paths = save_satellite_position_outputs(module2_position_records, OUTPUT_DIR, TEST_EPOCH_TIME)
+        module2_paths = save_satellite_position_outputs(module2_position_records, output_dir, TEST_EPOCH_TIME)
 
         # 生成模块二伪距修正调试文件（仅用于调试展示，不参与 SPP 解算）
         debug_records = generate_pseudorange_correction_debug_records(
             nav_data, TEST_EPOCH_TIME, RECEIVER_TRUE_POSITION
         )
-        debug_csv_path = save_pseudorange_correction_debug_csv(debug_records, OUTPUT_DIR)
+        debug_csv_path = save_pseudorange_correction_debug_csv(debug_records, output_dir)
 
         module_outputs["module2"] = [
             module2_paths["csv"],
@@ -393,7 +401,7 @@ def main() -> int:
             module_outputs,
             summary,
         )
-        print_test_report(summary, report_path)
+        print_test_report(summary, report_path, output_dir)
         return 0 if summary.success_epochs > 0 else 2
 
     except Exception as exc:
