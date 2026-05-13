@@ -147,6 +147,19 @@ def write_system_test_report(
     module_status: Dict[str, str],
     module_outputs: Dict[str, List[Path]],
     summary: AnalysisSummary,
+    enable_receiver_motion: bool = False,
+    receiver_initial_position: Optional[ECEF] = None,
+    receiver_velocity_ecef_mps: Optional[Tuple[float, float, float]] = None,
+    receiver_initial_approx_position: Optional[ECEF] = None,
+    receiver_true_position: Optional[ECEF] = None,
+    simulation_start_time: Optional[datetime] = None,
+    simulation_end_time: Optional[datetime] = None,
+    sampling_interval_seconds: int = 300,
+    max_iterations: int = 12,
+    convergence_threshold: float = 1e-2,
+    elevation_mask_deg: float = 0.0,
+    random_seed: int = 2026,
+    project_name: str = "北斗定位解算全流程软件系统",
 ) -> Path:
     """保存模块五系统测试报告。"""
 
@@ -157,52 +170,54 @@ def write_system_test_report(
     with report_path.open("w", encoding="utf-8-sig") as file:
         file.write("模块五：系统整合与测试报告\n")
         file.write("=" * 44 + "\n")
-        file.write(f"项目名称：{PROJECT_NAME}\n")
+        file.write(f"项目名称：{project_name}\n")
         file.write(f"测试时间：{datetime.now().isoformat(sep=' ', timespec='seconds')}\n")
         file.write(f"NAV 文件路径：{Path(nav_file_path)}\n")
 
         # 接收机运动模型说明
-        if ENABLE_RECEIVER_MOTION:
+        if enable_receiver_motion:
             file.write("接收机运动模型：动态接收机（ECEF 匀速直线运动）\n")
             file.write(
                 f"  初始真实坐标："
-                f"X={RECEIVER_INITIAL_POSITION[0]:.4f} m，"
-                f"Y={RECEIVER_INITIAL_POSITION[1]:.4f} m，"
-                f"Z={RECEIVER_INITIAL_POSITION[2]:.4f} m\n"
+                f"X={receiver_initial_position[0]:.4f} m，"
+                f"Y={receiver_initial_position[1]:.4f} m，"
+                f"Z={receiver_initial_position[2]:.4f} m\n"
             )
             file.write(
                 f"  ECEF 速度："
-                f"Vx={RECEIVER_VELOCITY_ECEF_MPS[0]:.4f} m/s，"
-                f"Vy={RECEIVER_VELOCITY_ECEF_MPS[1]:.4f} m/s，"
-                f"Vz={RECEIVER_VELOCITY_ECEF_MPS[2]:.4f} m/s\n"
+                f"Vx={receiver_velocity_ecef_mps[0]:.4f} m/s，"
+                f"Vy={receiver_velocity_ecef_mps[1]:.4f} m/s，"
+                f"Vz={receiver_velocity_ecef_mps[2]:.4f} m/s\n"
             )
             file.write(
                 f"  初始概略坐标："
-                f"X={RECEIVER_INITIAL_APPROX_POSITION[0]:.4f} m，"
-                f"Y={RECEIVER_INITIAL_APPROX_POSITION[1]:.4f} m，"
-                f"Z={RECEIVER_INITIAL_APPROX_POSITION[2]:.4f} m\n"
+                f"X={receiver_initial_approx_position[0]:.4f} m，"
+                f"Y={receiver_initial_approx_position[1]:.4f} m，"
+                f"Z={receiver_initial_approx_position[2]:.4f} m\n"
             )
         else:
             file.write("接收机运动模型：静态接收机\n")
             file.write(
                 "接收机真实 ECEF 坐标："
-                f"X={RECEIVER_TRUE_POSITION[0]:.4f} m，"
-                f"Y={RECEIVER_TRUE_POSITION[1]:.4f} m，"
-                f"Z={RECEIVER_TRUE_POSITION[2]:.4f} m\n"
+                f"X={receiver_true_position[0]:.4f} m，"
+                f"Y={receiver_true_position[1]:.4f} m，"
+                f"Z={receiver_true_position[2]:.4f} m\n"
             )
 
         file.write("坐标用途说明：\n")
         file.write("  - 真实坐标（true position）仅用于模拟伪距生成和三维定位误差评估（标准参考值）；\n")
         file.write("  - 初始概略坐标（initial approx position）用于 SPP 迭代最小二乘的迭代初值，\n")
         file.write("    与真实坐标存在人为偏差，更符合实际工程中\"先验概略坐标\"的应用场景。\n")
-        file.write(f"仿真起始时间：{SIMULATION_START_TIME.isoformat(sep=' ')}\n")
-        file.write(f"仿真结束时间：{SIMULATION_END_TIME.isoformat(sep=' ')}\n")
+        if simulation_start_time is not None:
+            file.write(f"仿真起始时间：{simulation_start_time.isoformat(sep=' ')}\n")
+        if simulation_end_time is not None:
+            file.write(f"仿真结束时间：{simulation_end_time.isoformat(sep=' ')}\n")
         file.write("时间系统说明：用户设置的仿真起止时间与导航文件中的 toc/toe 统一按 BDT（北斗时）理解。当前不做 UTC/GPST/BDT 转换。\n")
-        file.write(f"采样间隔：{SAMPLING_INTERVAL_SECONDS} s\n")
-        file.write(f"最大迭代次数：{MAX_ITERATIONS}\n")
-        file.write(f"收敛阈值：{CONVERGENCE_THRESHOLD} m\n")
-        file.write(f"高度角截止阈值：{ELEVATION_MASK_DEG}°\n")
-        file.write(f"随机数种子：{RANDOM_SEED}\n\n")
+        file.write(f"采样间隔：{sampling_interval_seconds} s\n")
+        file.write(f"最大迭代次数：{max_iterations}\n")
+        file.write(f"收敛阈值：{convergence_threshold} m\n")
+        file.write(f"高度角截止阈值：{elevation_mask_deg}°\n")
+        file.write(f"随机数种子：{random_seed}\n\n")
 
         module_names = {
             "module1": "模块一：RINEX NAV 导航文件解析",
@@ -256,188 +271,234 @@ def print_test_report(summary: AnalysisSummary, report_path: Path, output_dir: s
     print("======================================================\n")
 
 
-def main() -> int:
-    """主程序入口。"""
 
-    output_dir = _get_output_dir(NAV_FILE_PATH)
+def run_full_basic_pipeline(
+    nav_file_path: str | Path,
+    receiver_true_position: ECEF,
+    simulation_start_time: datetime,
+    simulation_end_time: datetime,
+    sampling_interval_seconds: int,
+    max_iterations: int,
+    convergence_threshold: float,
+    elevation_mask_deg: float,
+    random_seed: int,
+    enable_receiver_motion: bool = False,
+    receiver_initial_position: Optional[ECEF] = None,
+    receiver_velocity_ecef_mps: Optional[Tuple[float, float, float]] = None,
+    receiver_initial_approx_position: Optional[ECEF] = None,
+    receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None,
+    test_epoch_time: Optional[datetime] = None,
+    progress_callback: Optional[Callable[[dict, int, int], None]] = None,
+) -> Dict[str, Any]:
+    """运行完整的基础流程（module1-5），并返回结果字典。
+
+    返回字典包含：
+        - module_outputs: Dict[str, List[Path]]
+        - module_status: Dict[str, str]
+        - summary: AnalysisSummary
+        - report_path: Path
+        - results: List[dict]
+        - nav_data: dict
+        - parse_info: Any
+        - output_dir: str
+    """
+    from typing import Any, Callable, Tuple
+
+    output_dir = _get_output_dir(nav_file_path)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+
+    if test_epoch_time is None:
+        test_epoch_time = simulation_start_time
+
     module_status: Dict[str, str] = {}
     module_outputs: Dict[str, List[Path]] = {}
 
+    nav_path = Path(nav_file_path)
+    if not nav_path.exists():
+        raise FileNotFoundError(
+            f"NAV 文件不存在：{nav_path.resolve()}。请确认 nav/ 目录下存在 .26b_cnav 文件。"
+        )
+
+    # Module 1
+    nav_data, parse_info = parse_nav_file(nav_path)
+    module1_result = run_module1(
+        nav_path=nav_file_path,
+        receiver_approx=receiver_true_position,
+        epochs=[test_epoch_time],
+        seed=random_seed,
+        output_dir=output_dir,
+        elevation_mask_deg=elevation_mask_deg,
+        enable_pseudorange_outlier_filter=False,
+    )
+    module_outputs["module1"] = [
+        module1_result["nav_debug"],
+        module1_result["simulated_pseudorange"],
+        module1_result["summary"],
+    ]
+    module_status["module1"] = "完成"
+
+    sat_count = len(nav_data)
+    eph_count = sum(len(items) for items in nav_data.values())
+    if sat_count < 4 or eph_count < 4:
+        raise ValueError("星历不足：北斗卫星数量少于 4 颗，无法进行单点定位")
+
+    # Module 2
+    module2_position_records = calculate_all_satellite_positions(nav_data, test_epoch_time)
+    module2_paths = save_satellite_position_outputs(module2_position_records, output_dir, test_epoch_time)
+    debug_records = generate_pseudorange_correction_debug_records(
+        nav_data, test_epoch_time, receiver_true_position
+    )
+    debug_csv_path = save_pseudorange_correction_debug_csv(debug_records, output_dir)
+    module_outputs["module2"] = [
+        module2_paths["csv"],
+        module2_paths["summary"],
+        debug_csv_path,
+    ]
+    module_status["module2"] = "完成"
+
+    # Module 3
+    satellite_positions, satellite_health = _collect_satellite_data_from_module1(
+        nav_data, test_epoch_time
+    )
+    if len(satellite_positions) < 4:
+        raise ValueError("模块三无法运行：可用卫星位置少于 4 颗")
+    pseudo_records = generate_simulated_pseudorange_records(
+        satellite_positions,
+        receiver_true_position,
+        test_epoch_time,
+        seed=random_seed,
+        satellite_health=satellite_health,
+    )
+    pseudoranges = pseudorange_records_to_dict(pseudo_records)
+
+    _initial_approx = receiver_initial_approx_position
+    if _initial_approx is None:
+        _initial_approx = (
+            receiver_true_position[0] + 50.0,
+            receiver_true_position[1] - 50.0,
+            receiver_true_position[2] + 30.0,
+        )
+
+    single_solution = solve_spp(
+        satellite_positions,
+        pseudoranges,
+        initial_position=_initial_approx,
+        max_iter=max_iterations,
+        convergence_threshold=convergence_threshold,
+        satellite_health=satellite_health,
+        elevation_mask_deg=elevation_mask_deg,
+        enable_pseudorange_outlier_filter=False,
+        apply_corrections=False,
+    )
+    module3_paths = save_single_epoch_spp_outputs(
+        pseudo_records,
+        single_solution,
+        output_path,
+        test_epoch_time,
+        receiver_true_position,
+        elevation_mask_deg=elevation_mask_deg,
+    )
+    module_outputs["module3"] = list(module3_paths.values())
+    module_status["module3"] = "完成" if single_solution.converged else f"完成但解算失败：{single_solution.message}"
+
+    # Module 4
+    if enable_receiver_motion:
+        _receiver_true_position = receiver_initial_position
+        _receiver_initial_approx = receiver_initial_approx_position
+    else:
+        _receiver_true_position = receiver_true_position
+        _receiver_initial_approx = None
+
+    results, summary = run_continuous_positioning(
+        nav_data=nav_data,
+        start_time=simulation_start_time,
+        end_time=simulation_end_time,
+        interval_seconds=sampling_interval_seconds,
+        receiver_true_position=_receiver_true_position,
+        output_dir=output_path,
+        random_seed=random_seed,
+        max_iter=max_iterations,
+        convergence_threshold=convergence_threshold,
+        elevation_mask_deg=elevation_mask_deg,
+        progress_callback=progress_callback,
+        receiver_trajectory=receiver_trajectory,
+        receiver_initial_approx=_receiver_initial_approx,
+    )
+    module_outputs["module4"] = [
+        output_path / "module4_连续定位结果.csv",
+        output_path / "module4_误差统计.txt",
+        output_path / "module4_误差曲线.png",
+        output_path / "module4_轨迹图.png",
+        output_path / "module4_卫星DOP曲线.png",
+    ]
+    module_status["module4"] = "完成"
+
+    # Module 5
+    report_path = write_system_test_report(
+        output_dir=output_path,
+        nav_file_path=nav_file_path,
+        module_status=module_status,
+        module_outputs=module_outputs,
+        summary=summary,
+        enable_receiver_motion=enable_receiver_motion,
+        receiver_initial_position=receiver_initial_position,
+        receiver_velocity_ecef_mps=receiver_velocity_ecef_mps,
+        receiver_initial_approx_position=receiver_initial_approx_position,
+        receiver_true_position=receiver_true_position,
+        simulation_start_time=simulation_start_time,
+        simulation_end_time=simulation_end_time,
+        sampling_interval_seconds=sampling_interval_seconds,
+        max_iterations=max_iterations,
+        convergence_threshold=convergence_threshold,
+        elevation_mask_deg=elevation_mask_deg,
+        random_seed=random_seed,
+        project_name=PROJECT_NAME,
+    )
+
+    return {
+        "module_outputs": module_outputs,
+        "module_status": module_status,
+        "summary": summary,
+        "report_path": report_path,
+        "results": results,
+        "nav_data": nav_data,
+        "parse_info": parse_info,
+        "output_dir": output_dir,
+    }
+
+
+def main() -> int:
+    """主程序入口。"""
+
     try:
-        nav_path = Path(NAV_FILE_PATH)
-        if not nav_path.exists():
-            raise FileNotFoundError(
-                f"NAV 文件不存在：{nav_path.resolve()}。请在 basic/module5.py 中修改 NAV_FILE_PATH，或确认 nav/ 目录下存在 .26b_cnav 文件。"
-            )
-
-        print("模块一：正在解析 RINEX NAV 导航文件并生成输出...")
-        nav_data, parse_info = parse_nav_file(nav_path)
-
-        # 显式调用 run_module1() 生成模块一完整输出
-        module1_result = run_module1(
-            nav_path=NAV_FILE_PATH,
-            receiver_approx=RECEIVER_TRUE_POSITION,
-            epochs=[TEST_EPOCH_TIME],
-            seed=RANDOM_SEED,
-            output_dir=output_dir,
-            elevation_mask_deg=ELEVATION_MASK_DEG,
-            enable_pseudorange_outlier_filter=False,
-        )
-        module_outputs["module1"] = [
-            module1_result["nav_debug"],
-            module1_result["simulated_pseudorange"],
-            module1_result["summary"],
-        ]
-        module_status["module1"] = "完成"
-
-        sat_count = len(nav_data)
-        eph_count = sum(len(items) for items in nav_data.values())
-        if sat_count < 4 or eph_count < 4:
-            raise ValueError("星历不足：北斗卫星数量少于 4 颗，无法进行单点定位")
-        print(f"  解析完成：北斗卫星 {sat_count} 颗，星历记录 {eph_count} 条")
-
-        print("模块二：正在计算卫星位置与钟差...")
-        module2_position_records = calculate_all_satellite_positions(nav_data, TEST_EPOCH_TIME)
-        module2_paths = save_satellite_position_outputs(module2_position_records, output_dir, TEST_EPOCH_TIME)
-
-        # 生成模块二伪距修正调试文件（仅用于调试展示，不参与 SPP 解算）
-        debug_records = generate_pseudorange_correction_debug_records(
-            nav_data, TEST_EPOCH_TIME, RECEIVER_TRUE_POSITION
-        )
-        debug_csv_path = save_pseudorange_correction_debug_csv(debug_records, output_dir)
-
-        module_outputs["module2"] = [
-            module2_paths["csv"],
-            module2_paths["summary"],
-            debug_csv_path,
-        ]
-        module_status["module2"] = "完成"
-
-        satellite_positions, satellite_health = _collect_satellite_data_from_module1(
-            nav_data, TEST_EPOCH_TIME
-        )
-
-        print("模块三：正在生成模拟伪距并进行单历元 SPP 解算...")
-        if len(satellite_positions) < 4:
-            raise ValueError("模块三无法运行：可用卫星位置少于 4 颗")
-        pseudo_records = generate_simulated_pseudorange_records(
-            satellite_positions,
-            RECEIVER_TRUE_POSITION,
-            TEST_EPOCH_TIME,
-            seed=RANDOM_SEED,
-            satellite_health=satellite_health,
-        )
-        pseudoranges = pseudorange_records_to_dict(pseudo_records)
-        single_solution = solve_spp(
-            satellite_positions,
-            pseudoranges,
-            # 注意：此处使用概略坐标作为迭代初值，而非真实坐标。
-            # 真实坐标（RECEIVER_TRUE_POSITION）仅用于模拟伪距生成和误差评估，
-            # 不直接参与 SPP 迭代过程，符合实际工程应用中"先验概略位置"的用法。
-            initial_position=RECEIVER_INITIAL_APPROX_POSITION,
-            max_iter=MAX_ITERATIONS,
+        result = run_full_basic_pipeline(
+            nav_file_path=NAV_FILE_PATH,
+            receiver_true_position=RECEIVER_TRUE_POSITION,
+            simulation_start_time=SIMULATION_START_TIME,
+            simulation_end_time=SIMULATION_END_TIME,
+            sampling_interval_seconds=SAMPLING_INTERVAL_SECONDS,
+            max_iterations=MAX_ITERATIONS,
             convergence_threshold=CONVERGENCE_THRESHOLD,
-            satellite_health=satellite_health,
             elevation_mask_deg=ELEVATION_MASK_DEG,
-            enable_pseudorange_outlier_filter=False,
-            apply_corrections=False,
-        )
-        module3_paths = save_single_epoch_spp_outputs(
-            pseudo_records,
-            single_solution,
-            output_path,
-            TEST_EPOCH_TIME,
-            RECEIVER_TRUE_POSITION,
-            elevation_mask_deg=ELEVATION_MASK_DEG,
-        )
-        module_outputs["module3"] = list(module3_paths.values())
-        module_status["module3"] = "完成" if single_solution.converged else f"完成但解算失败：{single_solution.message}"
-
-        print("模块四：正在进行连续定位与结果分析...")
-
-        # 根据 ENABLE_RECEIVER_MOTION 构造轨迹参数
-        if ENABLE_RECEIVER_MOTION:
-            receiver_trajectory = build_linear_receiver_trajectory(
-                SIMULATION_START_TIME,
-                RECEIVER_INITIAL_POSITION,
-                RECEIVER_VELOCITY_ECEF_MPS,
-            )
-            receiver_initial_approx = RECEIVER_INITIAL_APPROX_POSITION
-            receiver_true_position = RECEIVER_INITIAL_POSITION
-        else:
-            receiver_trajectory = None
-            receiver_initial_approx = None
-            receiver_true_position = RECEIVER_TRUE_POSITION
-
-        _, summary = run_continuous_positioning(
-            nav_data=nav_data,
-            start_time=SIMULATION_START_TIME,
-            end_time=SIMULATION_END_TIME,
-            interval_seconds=SAMPLING_INTERVAL_SECONDS,
-            receiver_true_position=receiver_true_position,
-            output_dir=output_path,
             random_seed=RANDOM_SEED,
-            max_iter=MAX_ITERATIONS,
-            convergence_threshold=CONVERGENCE_THRESHOLD,
-            elevation_mask_deg=ELEVATION_MASK_DEG,
-            receiver_trajectory=receiver_trajectory,
-            receiver_initial_approx=receiver_initial_approx,
+            enable_receiver_motion=ENABLE_RECEIVER_MOTION,
+            receiver_initial_position=RECEIVER_INITIAL_POSITION,
+            receiver_velocity_ecef_mps=RECEIVER_VELOCITY_ECEF_MPS,
+            receiver_initial_approx_position=RECEIVER_INITIAL_APPROX_POSITION,
+            test_epoch_time=TEST_EPOCH_TIME,
         )
-        module_outputs["module4"] = [
-            output_path / "module4_连续定位结果.csv",
-            output_path / "module4_误差统计.txt",
-            output_path / "module4_误差曲线.png",
-            output_path / "module4_轨迹图.png",
-            output_path / "module4_卫星DOP曲线.png",
-        ]
-        module_status["module4"] = "完成"
-
-        report_path = write_system_test_report(
-            output_path,
-            nav_path,
-            module_status,
-            module_outputs,
-            summary,
+        print_test_report(
+            result["summary"],
+            result["report_path"],
+            result["output_dir"],
         )
-        print_test_report(summary, report_path, output_dir)
-        return 0 if summary.success_epochs > 0 else 2
-
+        return 0 if result["summary"].success_epochs > 0 else 2
     except Exception as exc:
-        # 如果运行过程中出现异常，也尽量生成模块五报告，说明失败原因。
-        module_status.setdefault("module1", "未完成")
-        module_status.setdefault("module2", "未完成")
-        module_status.setdefault("module3", "未完成")
-        module_status.setdefault("module4", "未完成")
         print(f"系统运行失败：{exc}")
         traceback.print_exc()
-
-        failed_summary = AnalysisSummary(
-            total_epochs=0,
-            success_epochs=0,
-            failed_epochs=0,
-            average_satellite_count=math.nan,
-            average_pdop=math.nan,
-            average_gdop=math.nan,
-            mean_error_3d=math.nan,
-            rms_error_3d=math.nan,
-            max_error_3d=math.nan,
-            min_error_3d=math.nan,
-            success_rate=0.0,
-            evaluation=f"系统未能完成完整流程：{exc}",
-        )
-        report_path = write_system_test_report(
-            output_path,
-            NAV_FILE_PATH,
-            module_status,
-            module_outputs,
-            failed_summary,
-        )
-        with report_path.open("a", encoding="utf-8-sig") as file:
-            file.write(f"\n失败原因：{exc}\n")
-        print(f"失败报告已保存：{report_path}")
         return 1
+
 
 
 if __name__ == "__main__":

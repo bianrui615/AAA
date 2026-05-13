@@ -94,6 +94,8 @@ if QT_IMPORT_ERROR is None:
         SAMPLING_INTERVAL_SECONDS,
         SIMULATION_END_TIME,
         SIMULATION_START_TIME,
+        _get_output_dir,
+        run_full_basic_pipeline,
     )
 
 
@@ -281,7 +283,7 @@ if QT_IMPORT_ERROR is None:
 
         def __init__(
             self,
-            nav_data: Dict[str, List[Any]],
+            nav_file_path: str | Path,
             start_time: datetime,
             end_time: datetime,
             interval_seconds: int,
@@ -291,14 +293,17 @@ if QT_IMPORT_ERROR is None:
             max_iter: int,
             convergence_threshold: float,
             elevation_mask_deg: float = 0.0,
+            enable_receiver_motion: bool = False,
+            receiver_initial_position: Optional[ECEF] = None,
+            receiver_velocity_ecef_mps: Optional[Tuple[float, float, float]] = None,
+            receiver_initial_approx: Optional[ECEF] = None,
             trajectory_mode: str = "静态接收机",
             velocity_mps: Optional[Tuple[float, float, float]] = None,
             trajectory_points: Optional[List[Tuple[float, float, float, float]]] = None,
             trajectory_csv_path: Optional[str] = None,
-            receiver_initial_approx: Optional[ECEF] = None,
         ) -> None:
             super().__init__()
-            self.nav_data = nav_data
+            self.nav_file_path = nav_file_path
             self.start_time = start_time
             self.end_time = end_time
             self.interval_seconds = interval_seconds
@@ -308,15 +313,18 @@ if QT_IMPORT_ERROR is None:
             self.max_iter = max_iter
             self.convergence_threshold = convergence_threshold
             self.elevation_mask_deg = elevation_mask_deg
+            self.enable_receiver_motion = enable_receiver_motion
+            self.receiver_initial_position = receiver_initial_position
+            self.receiver_velocity_ecef_mps = receiver_velocity_ecef_mps
+            self.receiver_initial_approx = receiver_initial_approx
             self.trajectory_mode = trajectory_mode
             self.velocity_mps = velocity_mps
             self.trajectory_points = trajectory_points
             self.trajectory_csv_path = trajectory_csv_path
-            self.receiver_initial_approx = receiver_initial_approx
 
         def run(self) -> None:
             try:
-                self.log_message.emit("开始连续定位解算...")
+                self.log_message.emit("开始完整基础流程解算...")
 
                 receiver_trajectory: Optional[Callable[[datetime], ECEF]] = None
 
@@ -357,22 +365,26 @@ if QT_IMPORT_ERROR is None:
                 def on_progress(row: dict, index: int, total: int) -> None:
                     self.progress_row.emit(row, index, total)
 
-                results, summary = run_continuous_positioning(
-                    nav_data=self.nav_data,
-                    start_time=self.start_time,
-                    end_time=self.end_time,
-                    interval_seconds=self.interval_seconds,
+                result = run_full_basic_pipeline(
+                    nav_file_path=self.nav_file_path,
                     receiver_true_position=self.receiver_true_position,
-                    output_dir=self.output_dir,
-                    random_seed=self.random_seed,
-                    max_iter=self.max_iter,
+                    simulation_start_time=self.start_time,
+                    simulation_end_time=self.end_time,
+                    sampling_interval_seconds=self.interval_seconds,
+                    max_iterations=self.max_iter,
                     convergence_threshold=self.convergence_threshold,
                     elevation_mask_deg=self.elevation_mask_deg,
-                    progress_callback=on_progress,
+                    random_seed=self.random_seed,
+                    enable_receiver_motion=self.enable_receiver_motion,
+                    receiver_initial_position=self.receiver_initial_position,
+                    receiver_velocity_ecef_mps=self.receiver_velocity_ecef_mps,
+                    receiver_initial_approx_position=self.receiver_initial_approx,
                     receiver_trajectory=receiver_trajectory,
-                    receiver_initial_approx=self.receiver_initial_approx,
+                    progress_callback=on_progress,
                 )
-                self.finished_ok.emit(results, summary)
+                self.log_message.emit(f"模块五系统测试报告：{result['report_path']}")
+                self.log_message.emit(f"输出目录：{result['output_dir']}")
+                self.finished_ok.emit(result["results"], result["summary"])
             except Exception as exc:
                 self.failed.emit(str(exc))
 
@@ -1074,22 +1086,30 @@ if QT_IMPORT_ERROR is None:
 
             self._reset_results()
             self._set_running(True)
+
+            nav_path = Path(self.nav_path_edit.text())
+            output_dir = Path(_get_output_dir(nav_path))
+            self._last_output_dir = output_dir
+
             self.worker = PositioningWorker(
-                nav_data=self.nav_data,
+                nav_file_path=nav_path,
                 start_time=start_time,
                 end_time=end_time,
                 interval_seconds=self.interval_spin.value(),
                 receiver_true_position=receiver_position,
-                output_dir=Path(OUTPUT_DIR),
+                output_dir=output_dir,
                 random_seed=self.seed_spin.value(),
                 max_iter=self.max_iter_spin.value(),
                 convergence_threshold=self.threshold_spin.value(),
                 elevation_mask_deg=self.elevation_mask_spin.value(),
+                enable_receiver_motion=(mode != "静态接收机"),
+                receiver_initial_position=receiver_position if mode != "静态接收机" else None,
+                receiver_velocity_ecef_mps=velocity_mps,
+                receiver_initial_approx=receiver_initial_approx,
                 trajectory_mode=mode,
                 velocity_mps=velocity_mps,
                 trajectory_points=trajectory_points,
                 trajectory_csv_path=trajectory_csv_path,
-                receiver_initial_approx=receiver_initial_approx,
             )
             self.worker.progress_row.connect(self.add_result_row)
             self.worker.finished_ok.connect(self.positioning_finished)
@@ -1139,7 +1159,8 @@ if QT_IMPORT_ERROR is None:
             self._refresh_error_plot()
             self._refresh_playback_controls()
             self.update_playback_plot(self.play_slider.value())
-            self.log(f"解算完成，CSV、统计文件和结果图已写入 {OUTPUT_DIR} 目录。")
+            out_dir = getattr(self, "_last_output_dir", Path(OUTPUT_DIR))
+            self.log(f"解算完成，CSV、统计文件和结果图已写入 {out_dir} 目录。")
             QMessageBox.information(self, "完成", "连续定位解算完成。")
 
         def positioning_failed(self, message: str) -> None:
@@ -1148,7 +1169,8 @@ if QT_IMPORT_ERROR is None:
             self.log(f"解算失败：{message}")
 
         def load_existing_csv(self) -> None:
-            default_path = Path(OUTPUT_DIR) / "module4_连续定位结果.csv"
+            out_dir = getattr(self, "_last_output_dir", Path(OUTPUT_DIR))
+            default_path = out_dir / "module4_连续定位结果.csv"
             file_name, _ = QFileDialog.getOpenFileName(
                 self,
                 "载入定位结果 CSV",
@@ -1172,9 +1194,9 @@ if QT_IMPORT_ERROR is None:
                 self.log(f"载入失败：{exc}")
 
         def export_outputs(self) -> None:
-            source_dir = Path(OUTPUT_DIR)
+            source_dir = getattr(self, "_last_output_dir", Path(OUTPUT_DIR))
             if not source_dir.exists():
-                QMessageBox.warning(self, "缺少输出", f"当前还没有可导出的 {OUTPUT_DIR} 目录。")
+                QMessageBox.warning(self, "缺少输出", f"当前还没有可导出的 {source_dir} 目录。")
                 return
             target_name = QFileDialog.getExistingDirectory(
                 self,
