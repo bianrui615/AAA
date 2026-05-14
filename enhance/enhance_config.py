@@ -39,15 +39,16 @@ MODEL_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "models"
 PREDICTION_OUTPUT_DIR = ML_OUTPUT_DIR / "predictions"
 FIGURE_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "figures"
 
-# 3 个不同 NAV 文件场景，统一使用基础部分默认参数
-# 数据直接从 outputs/basic/<nav_name>/module4_连续定位结果.csv 加载
+# 3 个不同 NAV 文件场景，与 basic/gui_scenario_runner.py 的三场景配置保持一致。
+# 若 outputs/basic/gui_scenario_runner/scenario_1..3 已存在，增强部分会优先读取这些
+# 基础部分结果；否则按下列配置重新运行并输出到 outputs/enhance/ml/scenarios/scenario1..3。
 SCENARIOS: List[ScenarioConfig] = [
     ScenarioConfig(
         name="scenario1",
         nav_file_path="nav/tarc0910.26b_cnav",
         receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
         start_time=datetime(2026, 4, 1, 0, 0, 0),
-        end_time=datetime(2026, 4, 1, 1, 0, 0),
+        end_time=datetime(2026, 4, 1, 6, 0, 0),
         interval_seconds=300,
         random_seed=2026,
         max_iter=12,
@@ -56,10 +57,10 @@ SCENARIOS: List[ScenarioConfig] = [
     ),
     ScenarioConfig(
         name="scenario2",
-        nav_file_path="nav/tarc1210.26b_cnav",
+        nav_file_path="nav/tarc1220.26b_cnav",
         receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
-        start_time=datetime(2026, 4, 1, 0, 0, 0),
-        end_time=datetime(2026, 4, 1, 1, 0, 0),
+        start_time=datetime(2026, 5, 2, 0, 0, 0),
+        end_time=datetime(2026, 5, 2, 6, 0, 0),
         interval_seconds=300,
         random_seed=2026,
         max_iter=12,
@@ -70,8 +71,8 @@ SCENARIOS: List[ScenarioConfig] = [
         name="scenario3",
         nav_file_path="nav/tarc1230.26b_cnav",
         receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
-        start_time=datetime(2026, 4, 1, 0, 0, 0),
-        end_time=datetime(2026, 4, 1, 1, 0, 0),
+        start_time=datetime(2026, 5, 3, 0, 0, 0),
+        end_time=datetime(2026, 5, 3, 6, 0, 0),
         interval_seconds=300,
         random_seed=2026,
         max_iter=12,

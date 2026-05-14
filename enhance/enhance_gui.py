@@ -499,8 +499,8 @@ class EnhanceMainWindow(QMainWindow):
         self._curve_canvas.fig.clf()
         axes = self._curve_canvas.fig.subplots(1, 2, sharey=False)
         for ax, key, title in [
-            (axes[0], "linear_regression", "线性回归误差对比"),
-            (axes[1], "random_forest", "随机森林误差对比"),
+            (axes[0], "线性回归", "线性回归误差对比"),
+            (axes[1], "随机森林", "随机森林误差对比"),
         ]:
             csv_p = eval_paths.get(key) or eval_paths.get("summary_csv")
             if csv_p and Path(csv_p).exists():
@@ -530,8 +530,8 @@ class EnhanceMainWindow(QMainWindow):
         self._scatter_canvas.fig.clf()
         axes2 = self._scatter_canvas.fig.subplots(1, 2)
         for ax, key, title in [
-            (axes2[0], "linear_regression", "线性回归"),
-            (axes2[1], "random_forest", "随机森林"),
+            (axes2[0], "线性回归", "线性回归"),
+            (axes2[1], "随机森林", "随机森林"),
         ]:
             summary_p = eval_paths.get("summary_csv")
             if summary_p and Path(summary_p).exists():

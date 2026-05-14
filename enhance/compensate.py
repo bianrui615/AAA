@@ -134,18 +134,18 @@ def run_compensation(train_result: Dict[str, any]) -> Dict[str, Path]:
 
     lr_path = compensate_and_save(
         train_result["lr_path"],
-        "linear_regression",
+        "线性回归",
         X_test,
         test_metadata,
     )
     rf_path = compensate_and_save(
         train_result["rf_path"],
-        "random_forest",
+        "随机森林",
         X_test,
         test_metadata,
     )
 
-    return {"linear_regression": lr_path, "random_forest": rf_path}
+    return {"线性回归": lr_path, "随机森林": rf_path}
 
 
 if __name__ == "__main__":

@@ -106,8 +106,8 @@ def evaluate_and_visualize(
     print("[evaluate_models] 开始评估模型效果...")
     FIGURE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    lr_rows = read_prediction_csv(prediction_paths["linear_regression"])
-    rf_rows = read_prediction_csv(prediction_paths["random_forest"])
+    lr_rows = read_prediction_csv(prediction_paths["线性回归"])
+    rf_rows = read_prediction_csv(prediction_paths["随机森林"])
 
     lr_metrics = compute_metrics(lr_rows)
     rf_metrics = compute_metrics(rf_rows)
@@ -217,8 +217,8 @@ def evaluate_and_visualize(
         f.write("4. 可引入动态窗口或时序模型（如 LSTM）利用历元间相关性。\n")
 
     # 3. 可视化
-    _plot_error_curves(lr_rows, "linear_regression")
-    _plot_error_curves(rf_rows, "random_forest")
+    _plot_error_curves(lr_rows, "线性回归")
+    _plot_error_curves(rf_rows, "随机森林")
     _plot_model_comparison_bar(lr_metrics, rf_metrics)
     _plot_predicted_vs_true(lr_rows, rf_rows)
 
@@ -226,6 +226,8 @@ def evaluate_and_visualize(
     return {
         "summary_csv": summary_csv,
         "stats_txt": stats_txt,
+        "线性回归": prediction_paths["线性回归"],
+        "随机森林": prediction_paths["随机森林"],
     }
 
 

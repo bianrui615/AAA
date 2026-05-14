@@ -33,7 +33,7 @@ if str(_project_root) not in sys.path:
 
 from enhance.compensate import run_compensation
 from enhance.dataset_builder import build_dataset
-from enhance.enhance_config import BASE_OUTPUT_DIR, FEATURE_COLUMNS, FIGURE_OUTPUT_DIR
+from enhance.enhance_config import BASE_OUTPUT_DIR, FEATURE_COLUMNS, FIGURE_OUTPUT_DIR, SCENARIOS
 from enhance.evaluate_models import evaluate_and_visualize
 from enhance.train_models import train_models
 
@@ -49,6 +49,11 @@ def write_technical_report(
     output_path: Path,
 ) -> None:
     """生成技术报告 技术报告.txt。"""
+    scenario_descriptions = {
+        "scenario1": "静态接收机",
+        "scenario2": "动态直线运动",
+        "scenario3": "动态折线轨迹",
+    }
     with output_path.open("w", encoding="utf-8-sig") as f:
         f.write("北斗 SPP 定位解算系统 — 提高部分技术报告\n")
         f.write("=" * 60 + "\n\n")
@@ -63,14 +68,16 @@ def write_technical_report(
 
         f.write("2. 数据来源说明\n")
         f.write("-" * 40 + "\n")
-        f.write(
-            "数据来源于 basic/gui_scenario_runner.py 运行的三场景结果。\n"
-            "使用 enhance/enhance_config.py 中定义的 3 个不同 BDS-3 CNAV 导航文件：\n"
-            "  场景 1：nav/tarc0910.26b_cnav（静态接收机，2026-04-01）\n"
-            "  场景 2：nav/tarc1220.26b_cnav（动态直线运动，2026-05-02）\n"
-            "  场景 3：nav/tarc1230.26b_cnav（动态折线轨迹，2026-05-03）\n"
-            "各场景独立随机种子，基于广播星历和模拟伪距误差模型产生定位结果。\n\n"
-        )
+        f.write("数据优先来源于 basic/gui_scenario_runner.py 运行的三场景结果。\n")
+        f.write("使用 enhance/enhance_config.py 中定义的 3 个 BDS-3 CNAV 场景：\n")
+        for index, scenario in enumerate(SCENARIOS, start=1):
+            description = scenario_descriptions.get(scenario.name, "连续定位场景")
+            f.write(
+                f"  场景 {index}：{scenario.nav_file_path}（{description}，"
+                f"{scenario.start_time:%Y-%m-%d} 至 {scenario.end_time:%Y-%m-%d}，"
+                f"输出名 {scenario.name}）\n"
+            )
+        f.write("各场景基于广播星历和模拟伪距误差模型产生定位结果。\n\n")
 
         f.write("3. 为什么不用 .obs 文件\n")
         f.write("-" * 40 + "\n")
@@ -267,8 +274,8 @@ def main() -> int:
         rms_a = math.sqrt(sum(v ** 2 for v in after) / len(after)) if after else math.nan
         return rms_b, rms_a
 
-    lr_rms_before, lr_rms_after = _read_rms(prediction_paths["linear_regression"])
-    rf_rms_before, rf_rms_after = _read_rms(prediction_paths["random_forest"])
+    lr_rms_before, lr_rms_after = _read_rms(prediction_paths["线性回归"])
+    rf_rms_before, rf_rms_after = _read_rms(prediction_paths["随机森林"])
 
     # 7. 技术报告
     report_path = BASE_OUTPUT_DIR / "技术报告.txt"
@@ -308,12 +315,12 @@ def main() -> int:
         train_result["lr_path"],
         train_result["rf_path"],
         train_result["summary_path"],
-        prediction_paths["linear_regression"],
-        prediction_paths["random_forest"],
+        prediction_paths["线性回归"],
+        prediction_paths["随机森林"],
         eval_paths["summary_csv"],
         eval_paths["stats_txt"],
-        FIGURE_OUTPUT_DIR / "linear_regression_误差曲线.png",
-        FIGURE_OUTPUT_DIR / "random_forest_误差曲线.png",
+        FIGURE_OUTPUT_DIR / "线性回归_误差曲线.png",
+        FIGURE_OUTPUT_DIR / "随机森林_误差曲线.png",
         FIGURE_OUTPUT_DIR / "模型对比柱状图.png",
         FIGURE_OUTPUT_DIR / "预测与真实误差对比.png",
         report_path,

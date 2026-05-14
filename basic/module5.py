@@ -430,7 +430,9 @@ def run_full_basic_pipeline(
         output_path / "module4_误差统计.txt",
         output_path / "module4_误差曲线.png",
         output_path / "module4_轨迹图.png",
+        output_path / "module4_真实与估计轨迹对比.png",
         output_path / "module4_卫星DOP曲线.png",
+        output_path / "module4_DOP与误差分析.png",
     ]
     module_status["module4"] = "完成"
 
