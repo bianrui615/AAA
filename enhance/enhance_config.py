@@ -43,7 +43,7 @@ FIGURE_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "figures"
 # 数据直接从 outputs/basic/<nav_name>/module4_连续定位结果.csv 加载
 SCENARIOS: List[ScenarioConfig] = [
     ScenarioConfig(
-        name="scenario_1",
+        name="scenario1",
         nav_file_path="nav/tarc0910.26b_cnav",
         receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
         start_time=datetime(2026, 4, 1, 0, 0, 0),
@@ -55,7 +55,7 @@ SCENARIOS: List[ScenarioConfig] = [
         elevation_mask_deg=0.0,
     ),
     ScenarioConfig(
-        name="scenario_2",
+        name="scenario2",
         nav_file_path="nav/tarc1210.26b_cnav",
         receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
         start_time=datetime(2026, 4, 1, 0, 0, 0),
@@ -67,7 +67,7 @@ SCENARIOS: List[ScenarioConfig] = [
         elevation_mask_deg=0.0,
     ),
     ScenarioConfig(
-        name="scenario_3",
+        name="scenario3",
         nav_file_path="nav/tarc1230.26b_cnav",
         receiver_true_position=(-2267800.0, 5009340.0, 3221000.0),
         start_time=datetime(2026, 4, 1, 0, 0, 0),

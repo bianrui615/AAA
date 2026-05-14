@@ -50,9 +50,9 @@ python enhance/run_enhance.py
 
 | 文件/目录 | 说明 |
 |-----------|------|
-| `ml/scenarios/scenario_1/...` | 场景 1 连续定位结果 |
-| `ml/scenarios/scenario_2/...` | 场景 2 连续定位结果 |
-| `ml/scenarios/scenario_3/...` | 场景 3 连续定位结果 |
+| `ml/scenarios/scenario1/...` | 场景 1 连续定位结果 |
+| `ml/scenarios/scenario2/...` | 场景 2 连续定位结果 |
+| `ml/scenarios/scenario3/...` | 场景 3 连续定位结果 |
 | `ml/机器学习数据集.csv` | 机器学习数据集（特征 + 标签） |
 | `models/线性回归模型.joblib` | 线性回归模型文件 |
 | `models/随机森林模型.joblib` | 随机森林模型文件 |

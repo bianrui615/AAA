@@ -58,7 +58,10 @@ def _time_range(start_time, end_time, interval_seconds: int):
 
 def _get_basic_output_dir(scenario_name: str) -> Path:
     """根据场景名找到 gui_scenario_runner 对应的输出目录。"""
-    return Path(f"outputs/basic/gui_scenario_runner/{scenario_name}")
+    basic_scenario_name = scenario_name
+    if scenario_name.startswith("scenario") and not scenario_name.startswith("scenario_"):
+        basic_scenario_name = scenario_name.replace("scenario", "scenario_", 1)
+    return Path(f"outputs/basic/gui_scenario_runner/{basic_scenario_name}")
 
 
 def _load_from_basic_csv(scenario: ScenarioConfig) -> Optional[List[dict]]:
@@ -334,7 +337,7 @@ def run_scenario_and_collect(
 
 
 def _save_scenario_results(records: List[dict], output_dir: Path) -> None:
-    """保存场景连续定位结果到 scenarios/scenario_X/module4_连续定位结果.csv。"""
+    """保存场景连续定位结果到 scenarios/scenarioX/module4_连续定位结果.csv。"""
     csv_path = output_dir / "module4_连续定位结果.csv"
     if not records:
         return
