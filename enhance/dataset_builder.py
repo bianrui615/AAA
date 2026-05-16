@@ -364,17 +364,22 @@ def _save_scenario_results(records: List[dict], output_dir: Path) -> None:
             writer.writerow({k: rec.get(k, "") for k in fieldnames})
 
 
-def build_dataset() -> Path:
+def build_dataset(scenarios: Optional[List[ScenarioConfig]] = None) -> Path:
     """运行所有场景并构建 机器学习数据集.csv。
 
-    仅保留成功解算历元写入数据集。
-    返回数据集 CSV 路径。
+    参数:
+        scenarios: 可选的场景子集。None 时使用 enhance_config.SCENARIOS 默认全集。
+                   GUI「场景配置」标签页通过该参数传入用户勾选的场景。
+    仅保留成功解算历元写入数据集。返回数据集 CSV 路径。
     """
-    print("[dataset_builder] 开始构建机器学习数据集...")
+    scenarios = scenarios if scenarios is not None else SCENARIOS
+    if not scenarios:
+        raise RuntimeError("场景列表为空，请至少勾选一个场景。")
+    print(f"[dataset_builder] 开始构建机器学习数据集（{len(scenarios)} 个场景）...")
     BASE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     all_records: List[dict] = []
-    for scenario in SCENARIOS:
+    for scenario in scenarios:
         try:
             scenario_records = run_scenario_and_collect(scenario)
             all_records.extend(scenario_records)

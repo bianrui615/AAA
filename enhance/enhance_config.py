@@ -39,9 +39,15 @@ MODEL_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "models"
 PREDICTION_OUTPUT_DIR = ML_OUTPUT_DIR / "predictions"
 FIGURE_OUTPUT_DIR = ENHANCE_OUTPUT_ROOT / "figures"
 
-# 3 个不同 NAV 文件场景，与 basic/gui_scenario_runner.py 的三场景配置保持一致。
-# 若 outputs/basic/gui_scenario_runner/scenario_1..3 已存在，增强部分会优先读取这些
-# 基础部分结果；否则按下列配置重新运行并输出到 outputs/enhance/ml/scenarios/scenario1..3。
+# 默认场景集合：9 个场景，覆盖不同 NAV 文件 / 接收机位置 / 时段 / 随机种子 /
+# 高度角掩膜，用于 LOSO 交叉验证下让模型见到更多分布。
+#
+# 前 3 个场景与 basic/gui_scenario_runner.py 保持一致，若已有基础部分结果会
+# 优先读取；scenario4-9 是 enhance 专属，CSV 不存在时 dataset_builder 会
+# 自动用 NAV + 模拟伪距重新生成（约 0.5-1s/场景）。
+#
+# 用户可在 enhance GUI「场景配置」标签页中勾选/编辑/新增/删除场景，
+# 「构建数据集」按钮只会跑勾选的场景。
 SCENARIOS: List[ScenarioConfig] = [
     ScenarioConfig(
         name="scenario1",
@@ -78,6 +84,78 @@ SCENARIOS: List[ScenarioConfig] = [
         max_iter=12,
         convergence_threshold=1e-2,
         elevation_mask_deg=0.0,
+    ),
+    ScenarioConfig(
+        name="scenario4",
+        nav_file_path="nav/tarc1240.26b_cnav",
+        receiver_true_position=(-2167800.0, 5109340.0, 3221000.0),
+        start_time=datetime(2026, 5, 4, 0, 0, 0),
+        end_time=datetime(2026, 5, 4, 6, 0, 0),
+        interval_seconds=300,
+        random_seed=2027,
+        max_iter=12,
+        convergence_threshold=1e-2,
+        elevation_mask_deg=5.0,
+    ),
+    ScenarioConfig(
+        name="scenario5",
+        nav_file_path="nav/tarc1250.26b_cnav",
+        receiver_true_position=(-2367800.0, 4909340.0, 3221000.0),
+        start_time=datetime(2026, 5, 5, 6, 0, 0),
+        end_time=datetime(2026, 5, 5, 12, 0, 0),
+        interval_seconds=300,
+        random_seed=2028,
+        max_iter=12,
+        convergence_threshold=1e-2,
+        elevation_mask_deg=5.0,
+    ),
+    ScenarioConfig(
+        name="scenario6",
+        nav_file_path="nav/tarc1260.26b_cnav",
+        receiver_true_position=(-2267800.0, 5009340.0, 3321000.0),
+        start_time=datetime(2026, 5, 6, 12, 0, 0),
+        end_time=datetime(2026, 5, 6, 18, 0, 0),
+        interval_seconds=300,
+        random_seed=2029,
+        max_iter=12,
+        convergence_threshold=1e-2,
+        elevation_mask_deg=10.0,
+    ),
+    ScenarioConfig(
+        name="scenario7",
+        nav_file_path="nav/tarc1270.26b_cnav",
+        receiver_true_position=(-2167800.0, 4909340.0, 3121000.0),
+        start_time=datetime(2026, 5, 7, 18, 0, 0),
+        end_time=datetime(2026, 5, 7, 23, 59, 0),
+        interval_seconds=300,
+        random_seed=2030,
+        max_iter=12,
+        convergence_threshold=1e-2,
+        elevation_mask_deg=10.0,
+    ),
+    ScenarioConfig(
+        name="scenario8",
+        nav_file_path="nav/tarc1280.26b_cnav",
+        receiver_true_position=(-2367800.0, 5109340.0, 3221000.0),
+        start_time=datetime(2026, 5, 8, 0, 0, 0),
+        end_time=datetime(2026, 5, 8, 6, 0, 0),
+        interval_seconds=300,
+        random_seed=2031,
+        max_iter=12,
+        convergence_threshold=1e-2,
+        elevation_mask_deg=15.0,
+    ),
+    ScenarioConfig(
+        name="scenario9",
+        nav_file_path="nav/tarc1290.26b_cnav",
+        receiver_true_position=(-2267800.0, 5009340.0, 3121000.0),
+        start_time=datetime(2026, 5, 9, 12, 0, 0),
+        end_time=datetime(2026, 5, 9, 18, 0, 0),
+        interval_seconds=300,
+        random_seed=2032,
+        max_iter=12,
+        convergence_threshold=1e-2,
+        elevation_mask_deg=15.0,
     ),
 ]
 

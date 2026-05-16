@@ -6,7 +6,11 @@
       "Bash(python -c \"import basic.module4; print\\('module4 OK'\\)\")",
       "Bash(python -c \"import enhance.enhance_config; import enhance.train_models; import enhance.dataset_builder; print\\('enhance modules OK'\\)\")",
       "Bash(python -c \"import enhance.enhance_gui; print\\('enhance_gui OK'\\)\")",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(python3)",
+      "PowerShell(Import-Csv *)",
+      "PowerShell(python enhance\\\\run_enhance.py)",
+      "Bash(python *)"
     ]
   }
 }
